@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		21C97C2B2D6F17DB00E6D0C8 /* OpenMeteoSdk in Frameworks */ = {isa = PBXBuildFile; productRef = 21C97C2A2D6F17DB00E6D0C8 /* OpenMeteoSdk */; };
+		21C97C342D6F559200E6D0C8 /* ArcGISToolkit in Frameworks */ = {isa = PBXBuildFile; productRef = 21C97C332D6F559200E6D0C8 /* ArcGISToolkit */; };
+		21D97DF52D4793F000A4B1B8 /* ArcGIS in Frameworks */ = {isa = PBXBuildFile; productRef = 21D97DF42D4793F000A4B1B8 /* ArcGIS */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		21D97DD72D47933E00A4B1B8 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -29,9 +35,34 @@
 		21D97DE02D47933E00A4B1B8 /* MyPlacesUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MyPlacesUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		21FC90EA2DAD164400656119 /* Exceptions for "MyPlaces" folder in "MyPlacesTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/ContentViewModel.swift,
+				Models/POIModel.swift,
+				MyPlacesApp.swift,
+			);
+			target = 21D97DD52D47933E00A4B1B8 /* MyPlacesTests */;
+		};
+		21FC90EB2DAD164400656119 /* Exceptions for "MyPlaces" folder in "MyPlacesUITests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/ContentViewModel.swift,
+				Models/POIModel.swift,
+				MyPlacesApp.swift,
+			);
+			target = 21D97DDF2D47933E00A4B1B8 /* MyPlacesUITests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		21D97DC62D47933D00A4B1B8 /* MyPlaces */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				21FC90EA2DAD164400656119 /* Exceptions for "MyPlaces" folder in "MyPlacesTests" target */,
+				21FC90EB2DAD164400656119 /* Exceptions for "MyPlaces" folder in "MyPlacesUITests" target */,
+			);
 			path = MyPlaces;
 			sourceTree = "<group>";
 		};
@@ -52,6 +83,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				21C97C342D6F559200E6D0C8 /* ArcGISToolkit in Frameworks */,
+				21C97C2B2D6F17DB00E6D0C8 /* OpenMeteoSdk in Frameworks */,
+				21D97DF52D4793F000A4B1B8 /* ArcGIS in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +146,9 @@
 			);
 			name = MyPlaces;
 			packageProductDependencies = (
+				21D97DF42D4793F000A4B1B8 /* ArcGIS */,
+				21C97C2A2D6F17DB00E6D0C8 /* OpenMeteoSdk */,
+				21C97C332D6F559200E6D0C8 /* ArcGISToolkit */,
 			);
 			productName = MyPlaces;
 			productReference = 21D97DC42D47933D00A4B1B8 /* MyPlaces.app */;
@@ -171,7 +208,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
-				LastUpgradeCheck = 1620;
+				LastUpgradeCheck = 1630;
 				TargetAttributes = {
 					21D97DC32D47933D00A4B1B8 = {
 						CreatedOnToolsVersion = 16.2;
@@ -195,6 +232,11 @@
 			);
 			mainGroup = 21D97DBB2D47933D00A4B1B8;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				21D97DF32D4793F000A4B1B8 /* XCRemoteSwiftPackageReference "arcgis-maps-sdk-swift" */,
+				21C97C292D6F17DB00E6D0C8 /* XCRemoteSwiftPackageReference "sdk" */,
+				21C97C322D6F559200E6D0C8 /* XCRemoteSwiftPackageReference "arcgis-maps-sdk-swift-toolkit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 21D97DC52D47933D00A4B1B8 /* Products */;
 			projectDirPath = "";
@@ -304,6 +346,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = D7K89D52HL;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -367,6 +410,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = D7K89D52HL;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -396,9 +440,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"MyPlaces/Preview Content\"";
-				DEVELOPMENT_TEAM = D7K89D52HL;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(PRODUCT_NAME)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -425,9 +469,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"MyPlaces/Preview Content\"";
-				DEVELOPMENT_TEAM = D7K89D52HL;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(PRODUCT_NAME)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -452,7 +496,6 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = D7K89D52HL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MARKETING_VERSION = 1.0;
@@ -471,7 +514,6 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = D7K89D52HL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MARKETING_VERSION = 1.0;
@@ -489,7 +531,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = D7K89D52HL;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = jonguler.com.MyPlacesUITests;
@@ -506,7 +547,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = D7K89D52HL;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = jonguler.com.MyPlacesUITests;
@@ -558,6 +598,51 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		21C97C292D6F17DB00E6D0C8 /* XCRemoteSwiftPackageReference "sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/open-meteo/sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.0;
+			};
+		};
+		21C97C322D6F559200E6D0C8 /* XCRemoteSwiftPackageReference "arcgis-maps-sdk-swift-toolkit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Esri/arcgis-maps-sdk-swift-toolkit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 200.6.0;
+			};
+		};
+		21D97DF32D4793F000A4B1B8 /* XCRemoteSwiftPackageReference "arcgis-maps-sdk-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Esri/arcgis-maps-sdk-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 200.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		21C97C2A2D6F17DB00E6D0C8 /* OpenMeteoSdk */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 21C97C292D6F17DB00E6D0C8 /* XCRemoteSwiftPackageReference "sdk" */;
+			productName = OpenMeteoSdk;
+		};
+		21C97C332D6F559200E6D0C8 /* ArcGISToolkit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 21C97C322D6F559200E6D0C8 /* XCRemoteSwiftPackageReference "arcgis-maps-sdk-swift-toolkit" */;
+			productName = ArcGISToolkit;
+		};
+		21D97DF42D4793F000A4B1B8 /* ArcGIS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 21D97DF32D4793F000A4B1B8 /* XCRemoteSwiftPackageReference "arcgis-maps-sdk-swift" */;
+			productName = ArcGIS;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 21D97DBC2D47933D00A4B1B8 /* Project object */;
 }
