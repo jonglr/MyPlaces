@@ -91,10 +91,6 @@ class VariableManager {
     
     // MARK: - External Information Retrieval
     
-    /// Stored URL to your AGOL Feature Layer
-    let featureLayerURL = URL(string: "https://services.arcgis.com/wg31rjAWgC3uC62p/arcgis/rest/services/Environment_Klassifikation/FeatureServer")!
-
-    
     /// Maps evironment type strings to doubles
     private func envTypeToDouble(from desc: String) -> Double {
         switch desc {
@@ -125,20 +121,28 @@ class VariableManager {
     /// Fetches the context score (0 = urban, 1 = rural, 2 = nature) at the given location.
     func currentEnvironment() async -> Double {
         /// Defaults to 1.0 (rural) if no match found or an error occurs.
-        guard let point = getCurrentLocationPoint() else { return 1.0 }
+        guard let point = getCurrentLocationPoint() else {
+            print("No valid user location.")
+            return 1.0
+        }
+        print (point)
         
         do {
-            let serviceFeatureTable = ServiceFeatureTable(url: featureLayerURL)
+            let serviceItem = PortalItem(
+                portal: .arcGISOnline(connection: .anonymous),
+                id: Item.ID("ffcc3b01c5754a7b9e98ed3b959d73d2")!
+            )
+            let serviceFeatureTable = ServiceFeatureTable(item: serviceItem, layerID: 0)
+            try await serviceFeatureTable.load()
             
             let queryParams = QueryParameters()
             queryParams.geometry = point
             queryParams.spatialRelationship = .intersects
-            queryParams.whereClause = "1=1"
-            
             let result = try await serviceFeatureTable.queryFeatures(using: queryParams)
             
             for feature in result.features() {
                 if let desc = feature.attributes["DESC_VAL"] as? String {
+                    print(desc)
                     return envTypeToDouble(from: desc)
                 }
             }
