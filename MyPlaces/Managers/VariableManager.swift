@@ -17,11 +17,10 @@ import CoreLocation
 
 class VariableManager {
     
-    private let  userManager = UserProfileManager.shared
     private let dataManager = DataManager.shared
     private let context = PersistenceController.shared.container.viewContext
     
-    // MARK: - Basic Conversions
+    // MARK: - Convertors
 
     /// converts the fclasses into corresponding doubles for the model input
     func fclassConversion(fclass: String) -> Double {
@@ -45,21 +44,37 @@ class VariableManager {
             "town_hall": 67.0, "toy_shop": 68.0, "tram_stop": 69.0, "travel_agent": 70.0,
             "video_shop": 71.0, "viewpoint": 72.0, "wayside_shrine": 73.0, "zoo": 74.0
         ]
-        return fclassToID[fclass] ?? -1.0
+        return fclassToID[fclass]!
     }
     
-    /// Generate MD5 hash of the string (128-bit) which results in a consistant output conversion
-    func createUUID(from string: String) -> UUID {
-        let hash = Insecure.MD5.hash(data: string.data(using: .utf8)!)
-        /// Convert the hash to Data
-        let hashData = Data(hash)
-        /// Extract the first 16 bytes (UUID requires 128 bits)
-        let uuidBytes = hashData.prefix(16)
-        /// Create a UUID from these bytes
-        let uuid = uuidBytes.withUnsafeBytes { uuidBytesPointer in
-            return UUID(uuid: uuidBytesPointer.load(as: uuid_t.self))
+    /// Generate UUID of the "fid" from the poi which results in a consistant output conversion
+    func uuidFromFID(_ fid: Int64) -> UUID {
+        let string = String(fid)
+        let data = Data(string.utf8)
+        let hash = Insecure.MD5.hash(data: data)
+        let uuidData = Data(hash.prefix(16))
+        return uuidData.withUnsafeBytes {
+            UUID(uuid: $0.load(as: uuid_t.self))
         }
-        return uuid
+    }
+    
+    /// Fetches and converts the Thematic Choice of the model (or user)
+    func currentUserTheme() -> Double {
+        /// Fetch the current theme as a string
+        guard let currentTheme = dataManager.fetchTheme() else {
+            return 5.0 // Default to 'explore' theme
+        }
+        /// Map the theme string to the corresponding Double value
+        let themeMapping: [String: Double] = [
+            "shopping": 0.0,
+            "food": 1.0,
+            "public transport": 2.0,
+            "culture": 3.0,
+            "outdoor": 4.0,
+            "explore": 5.0
+        ]
+        /// Return the mapped value, or 5.0 (explore) if the theme is not recognized
+        return themeMapping[currentTheme, default: 5.0]
     }
     
     // MARK: - Basic Location Variables
@@ -90,33 +105,6 @@ class VariableManager {
     
     
     // MARK: - External Information Retrieval
-    
-    /// Maps evironment type strings to doubles
-    private func envTypeToDouble(from desc: String) -> Double {
-        switch desc {
-        case "Städtisch (1)": return 0.0
-        case "Intermediär (2)": return 1.0
-        case "Ländlich (3)": return 2.0
-        default: return 1.0 /// Default to rural if unknown type
-        }
-    }
-    
-    /// Returns the current location at call in form of a WGS84 Point geometry type
-    func getCurrentLocationPoint() -> Point? {
-        let locationManager = CLLocationManager()
-        locationManager.requestWhenInUseAuthorization()
-
-        guard let userLocation = locationManager.location else {
-            print("User location not available")
-            return nil
-        }
-        let userPoint = Point(
-            x: userLocation.coordinate.longitude,
-            y: userLocation.coordinate.latitude,
-            spatialReference: .wgs84
-        )
-        return userPoint
-    }
     
     /// Fetches the context score (0 = urban, 1 = rural, 2 = nature) at the given location.
     func currentEnvironment() async -> Double {
@@ -172,6 +160,33 @@ class VariableManager {
             }
 
             return 2.0 /// Default: cloudy
+    }
+    
+    /// Maps evironment type strings to doubles
+    private func envTypeToDouble(from desc: String) -> Double {
+        switch desc {
+        case "Städtisch (1)": return 0.0
+        case "Intermediär (2)": return 1.0
+        case "Ländlich (3)": return 2.0
+        default: return 1.0 /// Default to rural if unknown type
+        }
+    }
+    
+    /// Returns the current location at call in form of a WGS84 Point geometry type
+    func getCurrentLocationPoint() -> Point? {
+        let locationManager = CLLocationManager()
+        locationManager.requestWhenInUseAuthorization()
+
+        guard let userLocation = locationManager.location else {
+            print("User location not available")
+            return nil
+        }
+        let userPoint = Point(
+            x: userLocation.coordinate.longitude,
+            y: userLocation.coordinate.latitude,
+            spatialReference: .wgs84
+        )
+        return userPoint
     }
     
     /// Maps the weather code to a double
@@ -272,7 +287,7 @@ class VariableManager {
     }
         
     func getPOIDetails(poiID: UUID) -> (isFavorite: Double, clickCount: Double, daysAgo: Double) {
-        let (fav,click,days) = DataManager.shared.getPOIInteractionDetails(poiID: poiID, context: context)
+        let (fav,click,days) = DataManager.shared.getPOIInteraction(poiID: poiID, context: context)
         /// convert them into Double values for the model calculation
         let isFavorite: Double
         if fav {isFavorite = 1.0}

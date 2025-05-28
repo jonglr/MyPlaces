@@ -20,4 +20,6 @@ final class VariablesTests: XCTestCase {
         XCTAssertEqual(convFclass, 0.0)
     }
     
+    
+    
 }

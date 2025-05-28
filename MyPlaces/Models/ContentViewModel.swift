@@ -23,7 +23,6 @@ class ContentViewModel: ObservableObject {
     @Published var displayedPOIs: [ArcGISFeature] = []
     
     /// Core Data Managers
-    private let userManager = UserProfileManager.shared
     private let context = PersistenceController.shared.container.viewContext
     private let dataManager = DataManager.shared
     
@@ -51,32 +50,13 @@ class ContentViewModel: ObservableObject {
         let model = await POIModel() // Initialize asynchronously
         self.poiModel = model
         self.allPOIs = model.POIs
-        /// POIs direkt in Core Data speichern?
-    }
-    
-    /// Load User Theme on App Start
-    func loadUserTheme() -> Double {
-        /// Fetch the current theme as a string
-        guard let currentTheme = dataManager.fetchTheme() else {
-            return 5.0 // Default to 'explore' theme
-        }
-        /// Map the theme string to the corresponding Double value
-        let themeMapping: [String: Double] = [
-            "shopping": 0.0,
-            "food": 1.0,
-            "public transport": 2.0,
-            "culture": 3.0,
-            "outdoor": 4.0,
-            "explore": 5.0
-        ]
-        /// Return the mapped value, or 5.0 (explore) if the theme is not recognized
-        return themeMapping[currentTheme, default: 5.0]
+        print ("loaded POIs")
     }
     
     /// Load Relevance Scores and Filter POIs
     @MainActor
     func loadRelevanceScores() async {
-        guard let user = userManager.currentUser else {
+        guard let user = dataManager.currentUser() else {
             print("No user logged in.")
             return
         }
@@ -103,66 +83,61 @@ class ContentViewModel: ObservableObject {
     /// Relevance Score Calculation by the ML Model
     func updateRelevance() async {
         for poi in allPOIs {
-            /// Convert the string ID to a UUID
-            let poiID = variableManager.createUUID(from: poi.attributes["osm_id"] as! String)
-            
-            /// get the attribute value pairs
-            let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
-            let open = variableManager.isOpen(otherTags: poi.attributes["opening_hours"] as! String)
-            
-            /// compute the relevance Score
-            let score = await relevanceModelManager.predictRelevance(
-                distance: variableManager.calculateDistance(origin: poi),
-                speed: variableManager.currentSpeed(),
-                weather: variableManager.currentWeather(),
-                isOpen: open,
-                favorite: isFavorite,
-                clickCount: clickCount,
-                lastClickedDate: daysAgo,
-                theme: loadUserTheme(),
-                fclass: variableManager.fclassConversion(fclass: poi.attributes["fclass"] as! String))
-            /// Safe the Relevance Score
-            saveRelevanceScore(for: poiID, score: score)
+            /// Convert the ID to a UUID
+            if let fidAny = poi.attributes["fid"],
+               let fid = (fidAny as? NSNumber)?.int64Value {
+                let poiID = variableManager.uuidFromFID(fid)
+                
+                /// get the attribute value pairs
+                let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
+                let open = variableManager.isOpen(otherTags: poi.attributes["opening_hours"] as! String)
+                
+                /// compute the relevance Score
+                let score = await relevanceModelManager.predictRelevance(
+                    distance: variableManager.calculateDistance(origin: poi),
+                    speed: variableManager.currentSpeed(),
+                    weather: variableManager.currentWeather(),
+                    isOpen: open,
+                    favorite: isFavorite,
+                    clickCount: clickCount,
+                    lastClickedDate: daysAgo,
+                    theme: variableManager.currentUserTheme(),
+                    fclass: variableManager.fclassConversion(fclass: poi.attributes["fclass"] as! String))
+                /// Safe the Relevance Score
+                dataManager.saveRelevanceScore(for: poiID, score: score)
+            } else {
+                print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
+            }
         }
     }
     
     /// Map theme choice by the ML Model
     func updateTheme() async {
         let thematicChoice = await thematicModelManager.predictTheme(timeOfDay: variableManager.currentTimeOfDay(), dayOfWeek: variableManager.currentDay(), environmentType: variableManager.currentEnvironment())
-        saveUserTheme(theme: thematicChoice)
+        dataManager.saveTheme(theme: thematicChoice)
     }
     
     
-    // MARK: - Save Data in Core Data
+    // MARK: - User Interactions
     
-    /// Save Relevance Score for a Specific POI
-    func saveRelevanceScore(for poiID: UUID, score: Double) {
-        guard let user = userManager.currentUser else {
-            print("No user logged in.")
-            return
-        }
-        guard let userID = user.userID else {
-            print("User does not have a valid ID.")
-            return
-        }
-        dataManager.saveRelevanceScore(for: poiID, userID: userID, score: score)
-    }
-    
-    /// Save the Thematic Choice for the specific user
-    func saveUserTheme(theme: String) {
+    func changeTheme(theme: String) {
         dataManager.saveTheme(theme: theme)
     }
     
-    
-    // MARK: - POI Interactions
-    
     func markPOIAsFavorite(poi: ArcGISFeature) {
-        let poiID = variableManager.createUUID(from: poi.attributes["osm_id"] as! String)
-        DataManager.shared.updatePOIInteraction(poiID: poiID, context: context, isFavorite: true)
+        if let fidAny = poi.attributes["fid"],
+           let fid = (fidAny as? NSNumber)?.int64Value {
+            let poiID = variableManager.uuidFromFID(fid)
+            DataManager.shared.updatePOIInteraction(poiID: poiID, context: context, isFavorite: true)
+        }
     }
         
     func recordPOIClick(poi: ArcGISFeature) {
-        let poiID = variableManager.createUUID(from: poi.attributes["osm_id"] as! String)
-        DataManager.shared.updatePOIInteraction(poiID: poiID, context: context)
+        if let fidAny = poi.attributes["fid"],
+           let fid = (fidAny as? NSNumber)?.int64Value {
+            let poiID = variableManager.uuidFromFID(fid)
+            DataManager.shared.updatePOIInteraction(poiID: poiID, context: context)
+        }
     }
+    
 }

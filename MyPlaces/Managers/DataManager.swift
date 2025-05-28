@@ -36,14 +36,13 @@ class DataManager: ObservableObject {
     }
     
     /// Create a New User Profile
-    func createUser(name: String, email: String) -> UserProfile? {
+    func createUser(name: String, email: String) {
         let newUser = UserProfile(context: context)
         newUser.userID = UUID()
         newUser.name = name
         newUser.email = email
         
         saveContext()
-        return newUser
     }
     
     /// Save Theme for the User
@@ -71,7 +70,16 @@ class DataManager: ObservableObject {
     // MARK: - Relevance Score Management
     
     /// Save a relevance score for a specific POI using its ID
-    func saveRelevanceScore(for poiID: UUID, userID: UUID, score: Double) {
+    func saveRelevanceScore(for poiID: UUID, score: Double) {
+        guard let user = currentUser() else {
+            print("No valid user found.")
+            return
+        }
+        guard let userID = user.userID else {
+            print("User does not have a valid ID.")
+            return
+        }
+        
         let context = self.context
         let fetchRequest: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "poiID == %@ AND user.id == %@", poiID as CVarArg, userID as CVarArg)
@@ -128,7 +136,7 @@ class DataManager: ObservableObject {
         saveContext()
     }
     
-    func getPOIInteractionDetails(poiID: UUID, context: NSManagedObjectContext) -> (isFavorite: Bool, clickCount: Int32, lastClickedDate: Date) {
+    func getPOIInteraction(poiID: UUID, context: NSManagedObjectContext) -> (isFavorite: Bool, clickCount: Int32, lastClickedDate: Date) {
         guard let poi = fetchPOIDetails(poiID: poiID, context: context) else {
             print("POI not found.")
             return (false, 0, Calendar.current.date(byAdding: .day, value: -600, to: Date()) ?? Date())

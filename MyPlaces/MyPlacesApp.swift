@@ -17,7 +17,6 @@ import CoreData
 struct MyPlacesApp: App {
     
     let persistenceController = PersistenceController.shared
-    @StateObject private var userProfileManager = UserProfileManager()
     @StateObject private var settingsManager = SettingsManager()
     @StateObject private var dataManager = DataManager(context: PersistenceController.shared.container.viewContext)
     
@@ -28,14 +27,12 @@ struct MyPlacesApp: App {
     var body: some SwiftUI.Scene {
         WindowGroup {
             /// if there is no user profile stored yet, the Onboarding view will be shown to the user
-            if userProfileManager.currentUser == nil {
+            if dataManager.currentUser() == nil {
                 OnboardingView()
-                    .environmentObject(userProfileManager)
             } else {
                 ContentView()
                     .environmentObject(settingsManager)
                     .environmentObject(dataManager)
-                    .environmentObject(userProfileManager)
                     .environment(\.managedObjectContext, persistenceController.container.viewContext)
             }
         }

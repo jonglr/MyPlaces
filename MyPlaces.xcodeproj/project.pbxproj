@@ -39,18 +39,56 @@
 		21FC90EA2DAD164400656119 /* Exceptions for "MyPlaces" folder in "MyPlacesTests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"CoreData Model/MyPlacesModel.xcdatamodeld",
+				"CoreData Model/POI+CoreDataClass.swift",
+				"CoreData Model/POI+CoreDataProperties.swift",
+				"CoreData Model/RelevanceScore+CoreDataClass.swift",
+				"CoreData Model/RelevanceScore+CoreDataProperties.swift",
+				"CoreData Model/UserProfile+CoreDataClass.swift",
+				"CoreData Model/UserProfile+CoreDataProperties.swift",
+				Keys.swift,
+				Managers/DataManager.swift,
+				Managers/PersistanceController.swift,
+				Managers/RelevanceModelManager.swift,
+				Managers/SettingsManager.swift,
+				Managers/ThematicModelManager.swift,
+				Managers/VariableManager.swift,
 				Models/ContentViewModel.swift,
 				Models/POIModel.swift,
 				MyPlacesApp.swift,
+				Resources/Assets.xcassets,
+				Resources/Relevance.mlmodel,
+				Resources/Thematic.mlmodel,
+				Views/ContentView.swift,
+				Views/OnboardingView.swift,
 			);
 			target = 21D97DD52D47933E00A4B1B8 /* MyPlacesTests */;
 		};
 		21FC90EB2DAD164400656119 /* Exceptions for "MyPlaces" folder in "MyPlacesUITests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"CoreData Model/MyPlacesModel.xcdatamodeld",
+				"CoreData Model/POI+CoreDataClass.swift",
+				"CoreData Model/POI+CoreDataProperties.swift",
+				"CoreData Model/RelevanceScore+CoreDataClass.swift",
+				"CoreData Model/RelevanceScore+CoreDataProperties.swift",
+				"CoreData Model/UserProfile+CoreDataClass.swift",
+				"CoreData Model/UserProfile+CoreDataProperties.swift",
+				Keys.swift,
+				Managers/DataManager.swift,
+				Managers/PersistanceController.swift,
+				Managers/RelevanceModelManager.swift,
+				Managers/SettingsManager.swift,
+				Managers/ThematicModelManager.swift,
+				Managers/VariableManager.swift,
 				Models/ContentViewModel.swift,
 				Models/POIModel.swift,
 				MyPlacesApp.swift,
+				Resources/Assets.xcassets,
+				Resources/Relevance.mlmodel,
+				Resources/Thematic.mlmodel,
+				Views/ContentView.swift,
+				Views/OnboardingView.swift,
 			);
 			target = 21D97DDF2D47933E00A4B1B8 /* MyPlacesUITests */;
 		};

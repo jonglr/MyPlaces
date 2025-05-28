@@ -13,7 +13,6 @@ import SwiftUI
 struct OnboardingView: View {
     @State private var name: String = ""
     @State private var email: String = ""
-    @EnvironmentObject private var userProfileManager: UserProfileManager
 
     var body: some View {
         VStack {
@@ -30,7 +29,7 @@ struct OnboardingView: View {
                 .padding()
 
             Button(action: {
-                userProfileManager.createUser(name: name, email: email)
+                DataManager.shared.createUser(name: name, email: email)
             }) {
                 Text("Get Started")
                     .font(.headline)

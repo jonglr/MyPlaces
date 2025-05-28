@@ -17,8 +17,6 @@ import CoreLocation
 
 struct ContentView: View {
     
-    @EnvironmentObject var settingsManager: SettingsManager
-    
     /// Keep a reference to the ContentViewModel
     @StateObject private var viewModel = ContentViewModel()
     

@@ -14,7 +14,7 @@ import Foundation
 class SettingsManager: ObservableObject {
     @Published var isDarkMode: Bool = false
 
-    func toggleTheme() {
+    func toggleDark() {
         isDarkMode.toggle()
     }
 }
