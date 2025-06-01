@@ -45,6 +45,7 @@ class DataManager: ObservableObject {
         newUser.userID = UUID()
         newUser.name = name
         newUser.email = email
+        newUser.isActive = true
         saveContext()
         hasUser = true
     }

@@ -3,4 +3,52 @@
    uuid = "71D0B432-A3EF-4B80-8A3B-633420CBC986"
    type = "1"
    version = "2.0">
+   <Breakpoints>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "1355A95A-8D47-4160-BEA3-FDFAD40AB659"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "MyPlaces/Models/ContentViewModel.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "58"
+            endingLineNumber = "58"
+            landmarkName = "loadRelevanceScores()"
+            landmarkType = "7">
+            <Locations>
+               <Location
+                  uuid = "1355A95A-8D47-4160-BEA3-FDFAD40AB659 - fcccfb7def9f5276"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "MyPlaces.ContentViewModel.loadRelevanceScores() async -&gt; ()"
+                  moduleName = "MyPlaces.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/jonguler/Library/Mobile%20Documents/com~apple~CloudDocs/Perso%CC%88nlich/8%20Schule/Uni/3%20Arbeiten/Masterarbeit/App%20Programming/MyPlaces/MyPlaces/Models/ContentViewModel.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "58"
+                  endingLineNumber = "58">
+               </Location>
+               <Location
+                  uuid = "1355A95A-8D47-4160-BEA3-FDFAD40AB659 - b68cf7d3657a37ea"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "(1) suspend resume partial function for MyPlaces.ContentViewModel.loadRelevanceScores() async -&gt; ()"
+                  moduleName = "MyPlaces.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/jonguler/Library/Mobile%20Documents/com~apple~CloudDocs/Perso%CC%88nlich/8%20Schule/Uni/3%20Arbeiten/Masterarbeit/App%20Programming/MyPlaces/MyPlaces/Models/ContentViewModel.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "58"
+                  endingLineNumber = "58">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+   </Breakpoints>
 </Bucket>

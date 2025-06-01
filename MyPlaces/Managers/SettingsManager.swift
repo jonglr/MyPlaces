@@ -29,7 +29,7 @@ class SettingsManager: ObservableObject {
     
     func switchUser(withID id: UUID) -> UserProfile {
         let request: NSFetchRequest<UserProfile> = UserProfile.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.predicate = NSPredicate(format: "userID == %@", id as CVarArg)
         request.fetchLimit = 1
 
         do {
