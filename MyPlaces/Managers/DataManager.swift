@@ -25,12 +25,13 @@ class DataManager: ObservableObject {
     /// Fetch the Current User Profile (Singleton)
     func currentUser() -> UserProfile? {
         let request: NSFetchRequest<UserProfile> = UserProfile.fetchRequest()
+        request.predicate = NSPredicate(format: "isActive == true")
         request.fetchLimit = 1
         
         do {
             return try context.fetch(request).first
         } catch {
-            print("Error fetching current user profile: \(error.localizedDescription)")
+            print("Error fetching active user profile: \(error.localizedDescription)")
             return nil
         }
     }
@@ -53,7 +54,7 @@ class DataManager: ObservableObject {
         }
         
         user.theme = theme
-        saveContext()
+        try! context.save()
         print("Theme saved successfully: \(theme)")
     }
         
@@ -72,33 +73,44 @@ class DataManager: ObservableObject {
     /// Save a relevance score for a specific POI using its ID
     func saveRelevanceScore(for poiID: UUID, score: Double) {
         guard let user = currentUser() else {
-            print("No valid user found.")
+            print("No valid user found to save Relevance Score")
             return
         }
         guard let userID = user.userID else {
-            print("User does not have a valid ID.")
+            print("User does not have a valid ID to save Relevance Score")
             return
         }
-        
-        let context = self.context
-        let fetchRequest: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "poiID == %@ AND user.id == %@", poiID as CVarArg, userID as CVarArg)
+        let poiFetch: NSFetchRequest<POI> = POI.fetchRequest()
+        poiFetch.predicate = NSPredicate(format: "id == %@", poiID as CVarArg)
+        poiFetch.fetchLimit = 1
         
         do {
-            /// Fetch existing score if it exists
+            guard let poi = try context.fetch(poiFetch).first else {
+                print("No POI found for Saving the Relevance Score with ID: \(poiID)")
+                return
+            }
+            
+            // ✅ Fetch any existing relevance score
+            let fetchRequest: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "poiID == %@ AND user.id == %@", poiID as CVarArg, userID as CVarArg)
+            
             let existingScores = try context.fetch(fetchRequest)
+            
             if let existingScore = existingScores.first {
+                // Update
                 existingScore.score = score
             } else {
-                /// Create a new score if none exists
+                // Create
                 let newScore = RelevanceScore(context: context)
                 newScore.userID = userID
                 newScore.poiID = poiID
                 newScore.score = score
+                newScore.user = user
+                newScore.poi = poi
             }
-            /// Save context
-            saveContext()
-            print("Relevance score saved successfully.")
+            
+            try! context.save()
+            print("Relevance score saved for POI \(poiID) and User \(userID).")
         } catch {
             print("Error saving relevance score: \(error.localizedDescription)")
         }

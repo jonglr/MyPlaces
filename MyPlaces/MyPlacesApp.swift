@@ -17,7 +17,7 @@ import CoreData
 struct MyPlacesApp: App {
     
     let persistenceController = PersistenceController.shared
-    @StateObject private var settingsManager = SettingsManager()
+    @StateObject private var settingsManager = SettingsManager(context: PersistenceController.shared.container.viewContext)
     @StateObject private var dataManager = DataManager(context: PersistenceController.shared.container.viewContext)
     
     init(){

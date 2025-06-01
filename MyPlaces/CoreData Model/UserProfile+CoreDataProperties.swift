@@ -20,6 +20,7 @@ extension UserProfile {
     @NSManaged public var name: String?
     @NSManaged public var theme: String?
     @NSManaged public var userID: UUID?
+    @NSManaged public var isActive: Bool
     @NSManaged public var relevanceScores: NSSet?
 
 }
