@@ -14,9 +14,11 @@ struct OnboardingView: View {
     @State private var name: String = ""
     @State private var email: String = ""
 
+    @EnvironmentObject var dataManager: DataManager
+    
     var body: some View {
         VStack {
-            Text("Welcome to MyPlacesApp")
+            Text("Welcome to MyPlaces")
                 .font(.largeTitle)
                 .padding()
 
@@ -29,7 +31,7 @@ struct OnboardingView: View {
                 .padding()
 
             Button(action: {
-                DataManager.shared.createUser(name: name, email: email)
+                dataManager.createUser(name: name, email: email)
             }) {
                 Text("Get Started")
                     .font(.headline)

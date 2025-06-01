@@ -23,7 +23,7 @@ class VariableManager {
     // MARK: - Convertors
 
     /// converts the fclasses into corresponding doubles for the model input
-    func fclassConversion(fclass: String) -> Double {
+    func fclassConversion(fclass: String) -> Double? {
         let fclassToID: [String: Double] = [
             "airfield": 0.0, "airport": 1.0, "arts_centre": 2.0, "artwork": 3.0, "bakery": 4.0,
             "bar": 5.0, "beach": 6.0, "beauty_shop": 7.0, "beverages": 8.0, "bicycle_rental": 9.0,

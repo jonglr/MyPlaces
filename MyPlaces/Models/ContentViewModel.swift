@@ -83,6 +83,13 @@ class ContentViewModel: ObservableObject {
     /// Relevance Score Calculation by the ML Model
     func updateRelevance() async {
         for poi in allPOIs {
+            
+            /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
+            guard let fclassRaw = poi.attributes["fclass"] as? String,
+                  let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
+                continue
+            }
+            
             /// Convert the ID to a UUID
             if let fidAny = poi.attributes["fid"],
                let fid = (fidAny as? NSNumber)?.int64Value {
@@ -102,7 +109,8 @@ class ContentViewModel: ObservableObject {
                     clickCount: clickCount,
                     lastClickedDate: daysAgo,
                     theme: variableManager.currentUserTheme(),
-                    fclass: variableManager.fclassConversion(fclass: poi.attributes["fclass"] as! String))
+                    fclass: fclass
+                )
                 /// Safe the Relevance Score
                 dataManager.saveRelevanceScore(for: poiID, score: score)
             } else {

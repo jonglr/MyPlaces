@@ -27,14 +27,15 @@ struct MyPlacesApp: App {
     var body: some SwiftUI.Scene {
         WindowGroup {
             /// if there is no user profile stored yet, the Onboarding view will be shown to the user
-            if dataManager.currentUser() == nil {
-                OnboardingView()
-            } else {
-                ContentView()
-                    .environmentObject(settingsManager)
-                    .environmentObject(dataManager)
-                    .environment(\.managedObjectContext, persistenceController.container.viewContext)
-            }
+            if dataManager.hasUser {
+                    ContentView()
+                        .environmentObject(dataManager)
+                        .environmentObject(settingsManager)
+                        .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                } else {
+                    OnboardingView()
+                        .environmentObject(dataManager)
+                }
         }
     }
 }

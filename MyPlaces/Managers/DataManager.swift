@@ -12,6 +12,9 @@ import CoreData
 import SwiftUI
 
 class DataManager: ObservableObject {
+    
+    @Published var hasUser: Bool = false
+    
     static let shared = DataManager(context: PersistenceController.shared.container.viewContext)
     private let context: NSManagedObjectContext
     
@@ -42,8 +45,8 @@ class DataManager: ObservableObject {
         newUser.userID = UUID()
         newUser.name = name
         newUser.email = email
-        
         saveContext()
+        hasUser = true
     }
     
     /// Save Theme for the User
@@ -61,7 +64,7 @@ class DataManager: ObservableObject {
     /// Fetch Theme for the User
     func fetchTheme() -> String? {
         guard let user = currentUser() else {
-            print("No valid user found.")
+            print("No valid user found")
             return nil
         }
         return user.theme
@@ -90,7 +93,7 @@ class DataManager: ObservableObject {
                 return
             }
             
-            // ✅ Fetch any existing relevance score
+            // Fetch any existing relevance score
             let fetchRequest: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "poiID == %@ AND user.id == %@", poiID as CVarArg, userID as CVarArg)
             
@@ -119,9 +122,9 @@ class DataManager: ObservableObject {
     
     // MARK: - POI Management
     
-    func fetchPOIDetails(poiID: UUID, context: NSManagedObjectContext) -> POI? {
+    func fetchPOI(poiID: UUID, context: NSManagedObjectContext) -> POI? {
         let request: NSFetchRequest<POI> = POI.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", poiID as CVarArg)
+        request.predicate = NSPredicate(format: "poiID == %@", poiID as CVarArg)
         request.fetchLimit = 1
         
         do {
@@ -133,7 +136,7 @@ class DataManager: ObservableObject {
     }
     
     func updatePOIInteraction(poiID: UUID, context: NSManagedObjectContext, isFavorite: Bool? = nil) {
-        guard let poi = fetchPOIDetails(poiID: poiID, context: context) else {
+        guard let poi = fetchPOI(poiID: poiID, context: context) else {
             print("POI not found.")
             return
         }
@@ -149,7 +152,7 @@ class DataManager: ObservableObject {
     }
     
     func getPOIInteraction(poiID: UUID, context: NSManagedObjectContext) -> (isFavorite: Bool, clickCount: Int32, lastClickedDate: Date) {
-        guard let poi = fetchPOIDetails(poiID: poiID, context: context) else {
+        guard let poi = fetchPOI(poiID: poiID, context: context) else {
             print("POI not found.")
             return (false, 0, Calendar.current.date(byAdding: .day, value: -600, to: Date()) ?? Date())
         }
