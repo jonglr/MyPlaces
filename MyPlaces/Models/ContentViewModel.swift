@@ -47,10 +47,9 @@ class ContentViewModel: ObservableObject {
     /// Async Initialization of the POIModel
     @MainActor
     private func initializePOIModel() async {
-        let model = await POIModel() // Initialize asynchronously
+        let model = await POIModel(variableManager: variableManager) // Initialize asynchronously
         self.poiModel = model
         self.allPOIs = model.POIs
-        print ("loaded POIs")
     }
     
     /// Load Relevance Scores and Filter POIs
@@ -65,13 +64,14 @@ class ContentViewModel: ObservableObject {
         request.predicate = NSPredicate(format: "user == %@ AND score > 0.5", user)
         do {
             let scores = try context.fetch(request)
+            print (scores)
             let filteredPOIs = poiModel?.POIs.filter { poi in
                 guard let poiID = poi.attributes["id"] as? UUID else { return false }
                 return scores.contains(where: { $0.poiID == poiID })
             } ?? []
             /// publish the POIs
             self.displayedPOIs = filteredPOIs
-            print("Loaded Relevant POIs: \(displayedPOIs.count)")
+            print("All POIs: \(allPOIs.count) Loaded Relevant POIs: \(displayedPOIs.count)")
         } catch {
             print("Error loading relevance scores: \(error)")
         }
@@ -83,13 +83,12 @@ class ContentViewModel: ObservableObject {
     /// Relevance Score Calculation by the ML Model
     func updateRelevance() async {
         for poi in allPOIs {
-            
             /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
             guard let fclassRaw = poi.attributes["fclass"] as? String,
                   let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
+                print (poi.attributes["fclass"])
                 continue
             }
-            
             /// Convert the ID to a UUID
             if let fidAny = poi.attributes["fid"],
                let fid = (fidAny as? NSNumber)?.int64Value {

@@ -20,27 +20,37 @@ struct ContentView: View {
     /// Keep a reference to the ContentViewModel
     @StateObject private var viewModel = ContentViewModel()
     
+    @EnvironmentObject var settingsManager: SettingsManager
+    
     /// Initialize a map variable
     @State private var map: Map
+    private let basemap_day: Basemap
+    private let basemap_night: Basemap
     
     // MARK: - Initialization
     init() {
         /// Create a PortalItem of the vector basemap
-        let basemapItem = PortalItem(
+        let basemapItemDay = PortalItem(
             portal: .arcGISOnline(connection: .anonymous),
-            id: Item.ID("b363ce54d1bf43f19b7fafc311d5a372")!
+            id: Item.ID("56987f73d2b44570960d8a8f67bbe104")!
         )
         let irrelevantPOIItem = PortalItem(
             portal: .arcGISOnline(connection: .anonymous),
             id: Item.ID("e725091c0dba4234a420736052397e2b")!
         )
+        let basemapItemNight = PortalItem(
+            portal: .arcGISOnline(connection: .anonymous),
+            id: Item.ID("f2ac67c0a5564cdc90f29585354e6163")!
+        )
         /// Make a Vector Tiled Layer from the portal items
-        let vtl_basemap = ArcGISVectorTiledLayer(item: basemapItem)
+        let vtl_basemap_day = ArcGISVectorTiledLayer(item: basemapItemDay)
+        let vtl_basemap_night = ArcGISVectorTiledLayer(item: basemapItemNight)
         let vtl_irrelevantPOI = ArcGISVectorTiledLayer(item: irrelevantPOIItem)
         /// Build a Basemap containing the vector tile layer
-        let basemap = Basemap(baseLayers: [vtl_basemap])
+        self.basemap_day = Basemap(baseLayers: [vtl_basemap_day])
+        self.basemap_night = Basemap(baseLayers: [vtl_basemap_night])
         /// Finally, create the Map
-        let initialMap = Map(basemap: basemap)
+        let initialMap = Map(basemap: basemap_day)
         /// Add the Irrelevant POIs as an overlay layer
         initialMap.addOperationalLayer(vtl_irrelevantPOI)
         /// Assign it to @State variable
@@ -62,67 +72,69 @@ struct ContentView: View {
     // MARK: - Body
     
     var body: some View {
-        MapViewReader { proxy in
-            MapView(map: map)
-                .locationDisplay(locationDisplay)
-            
+        ZStack(alignment: .topTrailing) {
+            // MAP LAYER
+            MapViewReader { proxy in
+                MapView(map: map)
+                    .locationDisplay(locationDisplay)
+                
                 /// Single tap gesture to identify layers
-                .onSingleTapGesture { screenPoint, _ in
-                    identifyScreenPoint = screenPoint
-                }
-            
+                    .onSingleTapGesture { screenPoint, _ in
+                        identifyScreenPoint = screenPoint
+                    }
+                
                 /// Start location display
-                .task {
-                    let locationManager = CLLocationManager()
-                    if locationManager.authorizationStatus == .notDetermined {
-                        locationManager.requestWhenInUseAuthorization()
+                    .task {
+                        let locationManager = CLLocationManager()
+                        if locationManager.authorizationStatus == .notDetermined {
+                            locationManager.requestWhenInUseAuthorization()
+                        }
+                        do {
+                            try await locationDisplay.dataSource.start()
+                            locationDisplay.initialZoomScale = 40_000
+                            locationDisplay.autoPanMode = .recenter
+                        } catch {
+                            self.failedToStart = true
+                        }
                     }
-                    do {
-                        try await locationDisplay.dataSource.start()
-                        locationDisplay.initialZoomScale = 40_000
-                        locationDisplay.autoPanMode = .recenter
-                    } catch {
-                        self.failedToStart = true
-                    }
-                }
                 /// Identify the tapped feature
-                .task(id: identifyScreenPoint) {
-                    guard let identifyScreenPoint else { return }
-                    
-                    let identifyResult = try? await proxy.identifyLayers(
-                        screenPoint: identifyScreenPoint,
-                        tolerance: 10,
-                        returnPopupsOnly: true
-                    ).first
-                    
-                    if let resultPopup = identifyResult?.popups.first {
+                    .task(id: identifyScreenPoint) {
+                        guard let identifyScreenPoint else { return }
+                        
+                        let identifyResult = try? await proxy.identifyLayers(
+                            screenPoint: identifyScreenPoint,
+                            tolerance: 10,
+                            returnPopupsOnly: true
+                        ).first
+                        
+                        if let resultPopup = identifyResult?.popups.first {
                             popup = resultPopup
-
+                            
                             /// Extract the ArcGIS feature and record a click
                             if let feature = resultPopup.geoElement as? ArcGISFeature {
                                 viewModel.recordPOIClick(poi: feature)
                                 print("Feature clicked: \(feature.attributes["osm_id"] as! String)")
                             }
                         }
-                }
-                /// Floating panel for pop-ups
-                .floatingPanel(
-                    selectedDetent: $floatingPanelDetent,
-                    horizontalAlignment: .leading,
-                    isPresented: $showPopup
-                ) {
-                    if let safePopup = popup {
-                        PopupView(popup: safePopup, isPresented: $showPopup)
-                            .showCloseButton(true)
-                            .padding()
-                    } else {
-                        Text("No feature found").padding()
                     }
-                }
+                /// Floating panel for pop-ups
+                    .floatingPanel(
+                        selectedDetent: $floatingPanelDetent,
+                        horizontalAlignment: .leading,
+                        isPresented: $showPopup
+                    ) {
+                        if let safePopup = popup {
+                            PopupView(popup: safePopup, isPresented: $showPopup)
+                                .showCloseButton(true)
+                                .padding()
+                        } else {
+                            Text("No feature found").padding()
+                        }
+                    }
                 /// In case location fails
-                .alert("Location display failed to start", isPresented: $failedToStart) {}
-            
-                .onAppear {
+                    .alert("Location display failed to start", isPresented: $failedToStart) {}
+                
+                    .onAppear {
                         /// Build a FeatureCollectionLayer from the processed POI features
                         let fcLayer = buildFeatureCollectionLayer(from: viewModel.displayedPOIs)
                         
@@ -131,9 +143,23 @@ struct ContentView: View {
                             map.addOperationalLayer(fcLayer)
                         }
                     }
-                }
+                    .onChange(of: settingsManager.isDarkMode) {
+                        print("Dark mode changed:", settingsManager.isDarkMode)
+                        map.basemap = settingsManager.isDarkMode ? basemap_night : basemap_day
+                    }
+            }
+            // TOGGLE OVERLAY
+            Toggle(isOn: $settingsManager.isDarkMode) {
+                Image(systemName: settingsManager.isDarkMode ? "moon.fill" : "sun.max.fill")
+                    .foregroundColor(.white)
+            }
+            .padding()
+            .background(Color.white.opacity(0.6))
+            .cornerRadius(10)
+            .padding()
         }
     }
+}
     
     // MARK: - Build a FeatureCollectionLayer from filtered POIs
     

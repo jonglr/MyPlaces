@@ -21,7 +21,7 @@ class VariableManager {
     private let context = PersistenceController.shared.container.viewContext
     
     // MARK: - Convertors
-
+    
     /// converts the fclasses into corresponding doubles for the model input
     func fclassConversion(fclass: String) -> Double? {
         let fclassToID: [String: Double] = [
@@ -78,7 +78,7 @@ class VariableManager {
     }
     
     // MARK: - Basic Location Variables
-
+    
     
     /// returns the current time in the hourly versions [0, 1, ... , 23]
     func currentTimeOfDay() -> Double {
@@ -113,28 +113,24 @@ class VariableManager {
             print("No valid user location.")
             return 1.0
         }
-        print (point)
-        
         do {
             let serviceItem = PortalItem(
-                portal: .arcGISOnline(connection: .anonymous),
+                portal: .arcGISOnline(connection: .authenticated),
                 id: Item.ID("ffcc3b01c5754a7b9e98ed3b959d73d2")!
             )
-            let serviceFeatureTable = ServiceFeatureTable(item: serviceItem, layerID: 0)
+            let serviceFeatureTable = ServiceFeatureTable(item: serviceItem)
             try await serviceFeatureTable.load()
             
             let queryParams = QueryParameters()
             queryParams.geometry = point
             queryParams.spatialRelationship = .intersects
+            queryParams.whereClause = "1=1"
             let result = try await serviceFeatureTable.queryFeatures(using: queryParams)
             
             for feature in result.features() {
-                if let desc = feature.attributes["DESC_VAL"] as? String {
-                    print(desc)
-                    return envTypeToDouble(from: desc)
-                }
+                let desc = feature.attributes["DESC_VAL"]
+                return self.envTypeToDouble(from: desc as! String)
             }
-            
         } catch {
             print("Error querying Environment feature layer: \(error.localizedDescription)")
         }
