@@ -45,7 +45,7 @@ struct ContentView: View {
         /// Make a Vector Tiled Layer from the portal items
         let vtl_basemap_day = ArcGISVectorTiledLayer(item: basemapItemDay)
         let vtl_basemap_night = ArcGISVectorTiledLayer(item: basemapItemNight)
-        let vtl_irrelevantPOI = ArcGISVectorTiledLayer(item: irrelevantPOIItem)
+        let fl_irrelevantPOI = FeatureLayer(item: irrelevantPOIItem)
         /// Build a Basemap containing the vector tile layer
         self.basemap_day = Basemap(baseLayers: [vtl_basemap_day])
         self.basemap_night = Basemap(baseLayers: [vtl_basemap_night])
@@ -54,7 +54,7 @@ struct ContentView: View {
         /// Assign it to @State variable
         self._map = State(initialValue: initialMap)
         /// Add the Irrelevant POIs as an overlay layer
-        map.addOperationalLayer(vtl_irrelevantPOI)
+        map.addOperationalLayer(fl_irrelevantPOI)
     }
     
     /// Variables for the location display & related states

@@ -12,13 +12,13 @@
 					<key>EndingColumnNumber</key>
 					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>118</string>
+					<string>119</string>
 					<key>StartingColumnNumber</key>
 					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>117</string>
+					<string>118</string>
 					<key>Timestamp</key>
-					<string>770618884.8317111</string>
+					<string>770635992.4563611</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -55,15 +55,15 @@
 				<key>location-parameters</key>
 				<dict>
 					<key>EndingColumnNumber</key>
-					<string>12</string>
+					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>17</string>
+					<string>81</string>
 					<key>StartingColumnNumber</key>
-					<string>11</string>
+					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>17</string>
+					<string>81</string>
 					<key>Timestamp</key>
-					<string>770576985.1614439</string>
+					<string>770635825.070497</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -79,16 +79,13 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string> </string>
+				<string></string>
 				<key>leading</key>
-				<string>    
-    /// The URL to the POI Feature Layers
-    private</string>
-				<key>trailing</key>
-				<string>let featureServiceURL = "https://services.arcgis.com/wg31rjAWgC3uC62p/arcgis/rest/services/OSM_POI/FeatureServer/0"
-    /// The feature table to query
-    private var featureTable: ServiceFeatureTable
+				<string>    }
+}
 </string>
+				<key>trailing</key>
+				<string></string>
 			</dict>
 			<key>type</key>
 			<string>bookmark</string>
@@ -144,15 +141,15 @@
 				<key>location-parameters</key>
 				<dict>
 					<key>EndingColumnNumber</key>
-					<string>105</string>
+					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>100</string>
+					<string>99</string>
 					<key>StartingColumnNumber</key>
-					<string>104</string>
+					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>100</string>
+					<string>98</string>
 					<key>Timestamp</key>
-					<string>770619890.741814</string>
+					<string>770636030.820758</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -168,15 +165,16 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>)</string>
+				<string>                    let open = variableManager.isOpen(otherTags: poi.attributes["other_tags"] as! String)
+</string>
 				<key>leading</key>
 				<string>                    /// get the attribute value pairs
                     let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
-                    let open = variableManager.isOpen(otherTags: poi.attributes["other_tags"] as! String</string>
+</string>
 				<key>trailing</key>
-				<string>
-                    
+				<string>                    
                     /// compute the relevance Score
+                    let score = await relevanceModelManager.predictRelevance(
 </string>
 			</dict>
 			<key>type</key>

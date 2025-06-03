@@ -24,6 +24,7 @@ class VariableManager {
     
     /// converts the fclasses into corresponding doubles for the model input
     func fclassConversion(fclass: String) -> Double? {
+        print (fclass)
         guard let url = Bundle.main.url(forResource: "fclass_mapping", withExtension: "json"),
                   let data = try? Data(contentsOf: url),
                   let mapping = try? JSONDecoder().decode([String: Double].self, from: data) else {

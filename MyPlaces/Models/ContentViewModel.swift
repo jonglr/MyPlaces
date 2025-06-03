@@ -83,8 +83,6 @@ class ContentViewModel: ObservableObject {
     /// Relevance Score Calculation by the ML Model
     func updateRelevance() async {
         for poi in allPOIs {
-            do {
-                try await poi.load()
                 /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
                 guard let fclassRaw = poi.attributes["fclass"] as? String,
                       let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
@@ -117,9 +115,6 @@ class ContentViewModel: ObservableObject {
                 } else {
                     print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
                 }
-            } catch {
-                print("Failed to load single POI for attribute retrieval: \(error)")
-            }
         }
     }
     
