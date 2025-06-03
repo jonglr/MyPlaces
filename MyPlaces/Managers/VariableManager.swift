@@ -24,27 +24,14 @@ class VariableManager {
     
     /// converts the fclasses into corresponding doubles for the model input
     func fclassConversion(fclass: String) -> Double? {
-        let fclassToID: [String: Double] = [
-            "airfield": 0.0, "airport": 1.0, "arts_centre": 2.0, "artwork": 3.0, "bakery": 4.0,
-            "bar": 5.0, "beach": 6.0, "beauty_shop": 7.0, "beverages": 8.0, "bicycle_rental": 9.0,
-            "bicycle_shop": 10.0, "biergarten": 11.0, "bookshop": 12.0, "bus_station": 13,
-            "bus_stop": 14.0, "butcher": 15.0, "cafe": 16.0, "car_dealership": 17.0, "car_rental": 18.0,
-            "chemist": 19.0, "cinema": 20.0, "clothes": 21.0, "community_centre": 22.0,
-            "computer_shop": 23.0, "convenience": 24.0, "department_store": 25.0, "dog_park": 26.0,
-            "doityourself": 27.0, "fast_food": 28.0, "ferry_terminal": 29.0, "florist": 30.0,
-            "food_court": 31.0, "furniture_shop": 32.0, "garden_centre": 33.0, "gift_shop": 34.0,
-            "greengrocer": 35.0, "hairdresser": 36.0, "helipad": 37.0, "jeweller": 38.0,
-            "kiosk": 39.0, "laundry": 40.0, "mall": 41.0, "market_place": 42.0,
-            "mobile_phone_shop": 43.0, "museum": 44.0, "newsagent": 45.0, "nightclub": 46.0,
-            "optician": 47.0, "outdoor_shop": 48.0, "park": 49.0, "peak": 50.0,
-            "picnic_site": 51.0, "pub": 52.0, "public_building": 53.0, "railway_halt": 54.0,
-            "railway_station": 55.0, "restaurant": 56.0, "shoe_shop": 57.0, "sports_shop": 58.0,
-            "spring": 59.0, "stationery": 60.0, "supermarket": 61.0, "taxi": 62.0,
-            "theatre": 63.0, "theme_park": 64.0, "tourist_info": 65.0, "tower": 66.0,
-            "town_hall": 67.0, "toy_shop": 68.0, "tram_stop": 69.0, "travel_agent": 70.0,
-            "video_shop": 71.0, "viewpoint": 72.0, "wayside_shrine": 73.0, "zoo": 74.0
-        ]
-        return fclassToID[fclass]!
+        guard let url = Bundle.main.url(forResource: "fclass_mapping", withExtension: "json"),
+                  let data = try? Data(contentsOf: url),
+                  let mapping = try? JSONDecoder().decode([String: Double].self, from: data) else {
+                print("Failed to load or decode fclass_mapping.json")
+                return nil
+            }
+
+            return mapping[fclass]
     }
     
     /// Generate UUID of the "fid" from the poi which results in a consistant output conversion
@@ -126,10 +113,10 @@ class VariableManager {
             queryParams.spatialRelationship = .intersects
             queryParams.whereClause = "1=1"
             let result = try await serviceFeatureTable.queryFeatures(using: queryParams)
-            
             for feature in result.features() {
                 let desc = feature.attributes["DESC_VAL"]
-                return self.envTypeToDouble(from: desc as! String)
+                //return self.envTypeToDouble(from: desc as! String)
+                return 1.0
             }
         } catch {
             print("Error querying Environment feature layer: \(error.localizedDescription)")
@@ -262,11 +249,12 @@ class VariableManager {
                 if timeParts.count == 2,
                    currentTime >= timeParts[0],
                    currentTime <= timeParts[1] {
+                    print("is Open")
                     return 1.0
                 }
             }
         }
-        
+        print("is Closed")
         return 0.0
     }
     

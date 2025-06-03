@@ -31,15 +31,15 @@ struct ContentView: View {
     init() {
         /// Create a PortalItem of the vector basemap
         let basemapItemDay = PortalItem(
-            portal: .arcGISOnline(connection: .anonymous),
+            portal: .arcGISOnline(connection: .authenticated),
             id: Item.ID("56987f73d2b44570960d8a8f67bbe104")!
         )
         let irrelevantPOIItem = PortalItem(
-            portal: .arcGISOnline(connection: .anonymous),
+            portal: .arcGISOnline(connection: .authenticated),
             id: Item.ID("e725091c0dba4234a420736052397e2b")!
         )
         let basemapItemNight = PortalItem(
-            portal: .arcGISOnline(connection: .anonymous),
+            portal: .arcGISOnline(connection: .authenticated),
             id: Item.ID("f2ac67c0a5564cdc90f29585354e6163")!
         )
         /// Make a Vector Tiled Layer from the portal items
@@ -51,10 +51,10 @@ struct ContentView: View {
         self.basemap_night = Basemap(baseLayers: [vtl_basemap_night])
         /// Finally, create the Map
         let initialMap = Map(basemap: basemap_day)
-        /// Add the Irrelevant POIs as an overlay layer
-        initialMap.addOperationalLayer(vtl_irrelevantPOI)
         /// Assign it to @State variable
         self._map = State(initialValue: initialMap)
+        /// Add the Irrelevant POIs as an overlay layer
+        map.addOperationalLayer(vtl_irrelevantPOI)
     }
     
     /// Variables for the location display & related states
@@ -154,7 +154,7 @@ struct ContentView: View {
                     .foregroundColor(.white)
             }
             .padding()
-            .background(Color.white.opacity(0.6))
+            .background(Color.black.opacity(0.6))
             .cornerRadius(10)
             .padding()
         }

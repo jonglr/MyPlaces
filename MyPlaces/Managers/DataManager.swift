@@ -85,7 +85,7 @@ class DataManager: ObservableObject {
             return
         }
         let poiFetch: NSFetchRequest<POI> = POI.fetchRequest()
-        poiFetch.predicate = NSPredicate(format: "id == %@", poiID as CVarArg)
+        poiFetch.predicate = NSPredicate(format: "poiID == %@", poiID as CVarArg)
         poiFetch.fetchLimit = 1
         
         do {
@@ -138,7 +138,7 @@ class DataManager: ObservableObject {
     
     func updatePOIInteraction(poiID: UUID, context: NSManagedObjectContext, isFavorite: Bool? = nil) {
         guard let poi = fetchPOI(poiID: poiID, context: context) else {
-            print("POI not found.")
+            print("POI not found to safe interaction.")
             return
         }
         /// Update favorite status if provided
@@ -154,7 +154,7 @@ class DataManager: ObservableObject {
     
     func getPOIInteraction(poiID: UUID, context: NSManagedObjectContext) -> (isFavorite: Bool, clickCount: Int32, lastClickedDate: Date) {
         guard let poi = fetchPOI(poiID: poiID, context: context) else {
-            print("POI not found.")
+            print("POI not found to retrieve interactions.")
             return (false, 0, Calendar.current.date(byAdding: .day, value: -600, to: Date()) ?? Date())
         }
         let fallbackDate = Calendar.current.date(byAdding: .day, value: -600, to: Date()) ?? Date()

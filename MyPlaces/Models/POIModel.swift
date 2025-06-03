@@ -19,7 +19,7 @@ class POIModel {
     /// The feature table to query
     private var featureTable: ServiceFeatureTable
     private let variableManager: VariableManager
-    /// Loaded POIs (ArcGISFeature Array)
+    /// Loaded POIs (ArcGISFeaturef Array)
     var POIs: [ArcGISFeature] = []
     
     /// Initialization of the POI layer
@@ -45,7 +45,7 @@ class POIModel {
         }
         
         /// Create a bounding box around the user location
-        let buffer: Double = 0.01 // ~1km buffer in degrees
+        let buffer: Double = 0.001 // ~1km buffer in degrees
             let envelope = Envelope(
                 xMin: userPoint.x - buffer,
                 yMin: userPoint.y - buffer,

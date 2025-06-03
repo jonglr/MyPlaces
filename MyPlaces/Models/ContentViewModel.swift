@@ -83,37 +83,42 @@ class ContentViewModel: ObservableObject {
     /// Relevance Score Calculation by the ML Model
     func updateRelevance() async {
         for poi in allPOIs {
-            /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
-            guard let fclassRaw = poi.attributes["fclass"] as? String,
-                  let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
-                print (poi.attributes["fclass"])
-                continue
-            }
-            /// Convert the ID to a UUID
-            if let fidAny = poi.attributes["fid"],
-               let fid = (fidAny as? NSNumber)?.int64Value {
-                let poiID = variableManager.uuidFromFID(fid)
-                
-                /// get the attribute value pairs
-                let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
-                let open = variableManager.isOpen(otherTags: poi.attributes["opening_hours"] as! String)
-                
-                /// compute the relevance Score
-                let score = await relevanceModelManager.predictRelevance(
-                    distance: variableManager.calculateDistance(origin: poi),
-                    speed: variableManager.currentSpeed(),
-                    weather: variableManager.currentWeather(),
-                    isOpen: open,
-                    favorite: isFavorite,
-                    clickCount: clickCount,
-                    lastClickedDate: daysAgo,
-                    theme: variableManager.currentUserTheme(),
-                    fclass: fclass
-                )
-                /// Safe the Relevance Score
-                dataManager.saveRelevanceScore(for: poiID, score: score)
-            } else {
-                print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
+            do {
+                try await poi.load()
+                /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
+                guard let fclassRaw = poi.attributes["fclass"] as? String,
+                      let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
+                    continue
+                }
+                /// Convert the ID to a UUID
+                if let fidAny = poi.attributes["fid"],
+                   let fid = (fidAny as? NSNumber)?.int64Value {
+                    let poiID = variableManager.uuidFromFID(fid)
+                    print (poiID)
+                    
+                    /// get the attribute value pairs
+                    let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
+                    let open = variableManager.isOpen(otherTags: poi.attributes["other_tags"] as! String)
+                    
+                    /// compute the relevance Score
+                    let score = await relevanceModelManager.predictRelevance(
+                        distance: variableManager.calculateDistance(origin: poi),
+                        speed: variableManager.currentSpeed(),
+                        weather: variableManager.currentWeather(),
+                        isOpen: open,
+                        favorite: isFavorite,
+                        clickCount: clickCount,
+                        lastClickedDate: daysAgo,
+                        theme: variableManager.currentUserTheme(),
+                        fclass: fclass
+                    )
+                    /// Safe the Relevance Score
+                    dataManager.saveRelevanceScore(for: poiID, score: score)
+                } else {
+                    print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
+                }
+            } catch {
+                print("Failed to load single POI for attribute retrieval: \(error)")
             }
         }
     }

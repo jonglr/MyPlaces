@@ -10,15 +10,15 @@
 				<key>location-parameters</key>
 				<dict>
 					<key>EndingColumnNumber</key>
-					<string>66</string>
+					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>131</string>
+					<string>118</string>
 					<key>StartingColumnNumber</key>
 					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>131</string>
+					<string>117</string>
 					<key>Timestamp</key>
-					<string>770581810.8162839</string>
+					<string>770618884.8317111</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -34,60 +34,16 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>                return self.envTypeToDouble(from: desc as! String)</string>
+				<string>                //return self.envTypeToDouble(from: desc as! String)
+</string>
 				<key>leading</key>
 				<string>            for feature in result.features() {
                 let desc = feature.attributes["DESC_VAL"]
 </string>
 				<key>trailing</key>
-				<string>
+				<string>                return 1.0
             }
         } catch {
-</string>
-			</dict>
-			<key>type</key>
-			<string>bookmark</string>
-		</dict>
-		<dict>
-			<key>destination</key>
-			<dict>
-				<key>location-parameters</key>
-				<dict>
-					<key>EndingColumnNumber</key>
-					<string>0</string>
-					<key>EndingLineNumber</key>
-					<string>89</string>
-					<key>StartingColumnNumber</key>
-					<string>0</string>
-					<key>StartingLineNumber</key>
-					<string>88</string>
-					<key>Timestamp</key>
-					<string>770548074.10532</string>
-				</dict>
-				<key>rebasable-url</key>
-				<dict>
-					<key>base</key>
-					<string>workspace</string>
-					<key>payload</key>
-					<dict>
-						<key>relative-path</key>
-						<string>MyPlaces/Models/ContentViewModel.swift</string>
-					</dict>
-				</dict>
-			</dict>
-			<key>text-context</key>
-			<dict>
-				<key>focused</key>
-				<string>                print (poi.attributes["fclass"])
-</string>
-				<key>leading</key>
-				<string>            guard let fclassRaw = poi.attributes["fclass"] as? String,
-                  let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
-</string>
-				<key>trailing</key>
-				<string>                continue
-            }
-            /// Convert the ID to a UUID
 </string>
 			</dict>
 			<key>type</key>
@@ -143,15 +99,15 @@
 				<key>location-parameters</key>
 				<dict>
 					<key>EndingColumnNumber</key>
-					<string>35</string>
+					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>147</string>
+					<string>148</string>
 					<key>StartingColumnNumber</key>
-					<string>28</string>
+					<string>0</string>
 					<key>StartingLineNumber</key>
 					<string>147</string>
 					<key>Timestamp</key>
-					<string>770580376.603918</string>
+					<string>770623301.791746</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -167,15 +123,60 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>basemap</string>
+				<string>                        map.basemap = settingsManager.isDarkMode ? basemap_night : basemap_day
+</string>
 				<key>leading</key>
 				<string>                    .onChange(of: settingsManager.isDarkMode) {
                         print("Dark mode changed:", settingsManager.isDarkMode)
-                        map.</string>
+</string>
 				<key>trailing</key>
-				<string> = settingsManager.isDarkMode ? basemap_night : basemap_day
-                    }
+				<string>                    }
             }
+            // TOGGLE OVERLAY
+</string>
+			</dict>
+			<key>type</key>
+			<string>bookmark</string>
+		</dict>
+		<dict>
+			<key>destination</key>
+			<dict>
+				<key>location-parameters</key>
+				<dict>
+					<key>EndingColumnNumber</key>
+					<string>105</string>
+					<key>EndingLineNumber</key>
+					<string>100</string>
+					<key>StartingColumnNumber</key>
+					<string>104</string>
+					<key>StartingLineNumber</key>
+					<string>100</string>
+					<key>Timestamp</key>
+					<string>770619890.741814</string>
+				</dict>
+				<key>rebasable-url</key>
+				<dict>
+					<key>base</key>
+					<string>workspace</string>
+					<key>payload</key>
+					<dict>
+						<key>relative-path</key>
+						<string>MyPlaces/Models/ContentViewModel.swift</string>
+					</dict>
+				</dict>
+			</dict>
+			<key>text-context</key>
+			<dict>
+				<key>focused</key>
+				<string>)</string>
+				<key>leading</key>
+				<string>                    /// get the attribute value pairs
+                    let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
+                    let open = variableManager.isOpen(otherTags: poi.attributes["other_tags"] as! String</string>
+				<key>trailing</key>
+				<string>
+                    
+                    /// compute the relevance Score
 </string>
 			</dict>
 			<key>type</key>
