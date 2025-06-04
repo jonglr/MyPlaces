@@ -24,14 +24,12 @@ class VariableManager {
     
     /// converts the fclasses into corresponding doubles for the model input
     func fclassConversion(fclass: String) -> Double? {
-        print (fclass)
         guard let url = Bundle.main.url(forResource: "fclass_mapping", withExtension: "json"),
                   let data = try? Data(contentsOf: url),
                   let mapping = try? JSONDecoder().decode([String: Double].self, from: data) else {
                 print("Failed to load or decode fclass_mapping.json")
                 return nil
             }
-
             return mapping[fclass]
     }
     
@@ -113,11 +111,10 @@ class VariableManager {
             queryParams.geometry = point
             queryParams.spatialRelationship = .intersects
             queryParams.whereClause = "1=1"
-            let result = try await serviceFeatureTable.queryFeatures(using: queryParams)
+            let result = try await serviceFeatureTable.queryFeatures(using: queryParams, queryFeatureFields: .loadAll)
             for feature in result.features() {
                 let desc = feature.attributes["DESC_VAL"]
-                //return self.envTypeToDouble(from: desc as! String)
-                return 1.0
+                return self.envTypeToDouble(from: desc as! String)
             }
         } catch {
             print("Error querying Environment feature layer: \(error.localizedDescription)")
@@ -225,12 +222,22 @@ class VariableManager {
         
         for entry in entries {
             let parts = entry.components(separatedBy: " ")
-            guard parts.count == 2 else { continue }
-            
-            let days = parts[0].split(separator: "-")
-            let timeRange = parts[1]
-            
-            /// Check if today is in the day range
+
+            let daysPart: String
+            let timePart: String
+
+            if parts.count == 2 {
+                daysPart = parts[0]
+                timePart = parts[1]
+            } else if parts.count == 1 {
+                // No day range given, assume applies every day
+                daysPart = "Mo-Su"
+                timePart = parts[0]
+            } else {
+                continue
+            }
+
+            let days = daysPart.split(separator: "-")
             let validToday: Bool
             if days.count == 2 {
                 let order = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
@@ -242,20 +249,18 @@ class VariableManager {
                     validToday = false
                 }
             } else {
-                validToday = String(days[0]) == normalizedDay
+                validToday = String(daysPart) == normalizedDay
             }
-            
+
             if validToday {
-                let timeParts = timeRange.split(separator: "-").map { String($0) }
+                let timeParts = timePart.split(separator: "-").map { String($0) }
                 if timeParts.count == 2,
                    currentTime >= timeParts[0],
                    currentTime <= timeParts[1] {
-                    print("is Open")
                     return 1.0
                 }
             }
         }
-        print("is Closed")
         return 0.0
     }
     
@@ -264,11 +269,22 @@ class VariableManager {
         /// retrieve the location of the user
         guard let point = getCurrentLocationPoint() else { return 360.0 }
         /// Get the POI Geometry and convert into a Point Feature, else return the max kilometer distance of the model training dataset
-        guard let poi = poi.geometry as? Point else { return 360.0 }
-        /// Calculate the distance between
-        let distanceMeters = GeometryEngine.distance(from: point, to: poi)
-        /// Return the distance in Kiolometeres
-        return distanceMeters / 1000.0
+        guard let poiPoint = poi.geometry as? Point else { return 360.0 }
+        /// Reproject both to WGS84 to ensure compatibility
+        guard
+            let userPoint = GeometryEngine.project(point, into: .webMercator),
+            let featurePoint = GeometryEngine.project(poiPoint, into: .webMercator)
+        else {
+            print("Projection failed")
+            return 360.0
+        }
+
+        let distanceMeters = GeometryEngine.distance(from: userPoint, to: featurePoint)
+        guard !distanceMeters.isNaN else {
+            print("distance is Nan")
+            return 360.0
+        }
+        return distanceMeters/1000
     }
         
     func getPOIDetails(poiID: UUID) -> (isFavorite: Double, clickCount: Double, daysAgo: Double) {

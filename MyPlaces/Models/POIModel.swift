@@ -29,6 +29,7 @@ class POIModel {
                 id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
             )
             let featureLayer = FeatureLayer(item: portalItem)
+            /// Load th Feature Layer to have all the attributes available
             do {
                 try await featureLayer.load()
             } catch {
@@ -69,7 +70,8 @@ class POIModel {
             
             /// Directly converting the sequence of features into an array
             guard let featureTable = self.featureTable else { return }
-            let result = try await featureTable.queryFeatures(using: query)
+            /// Query the feature table and store retrieve all the attribute fields
+            let result = try await featureTable.queryFeatures(using: query, queryFeatureFields: .loadAll)
             /// Convert the Query result to an array of ArcGISFeatures
             let features = Array(result.features()).compactMap { $0 as? ArcGISFeature }
             self.POIs = features

@@ -91,16 +91,17 @@ class ContentViewModel: ObservableObject {
                 /// Convert the ID to a UUID
                 if let fidAny = poi.attributes["fid"],
                    let fid = (fidAny as? NSNumber)?.int64Value {
+                    /// Transform the fid value into a UUID
                     let poiID = variableManager.uuidFromFID(fid)
-                    print (poiID)
                     
-                    /// get the attribute value pairs
+                    /// get the attributes for the score computation ot the poi
                     let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
                     let open = variableManager.isOpen(otherTags: poi.attributes["other_tags"] as! String)
+                    let distance = variableManager.calculateDistance(origin: poi)
                     
                     /// compute the relevance Score
                     let score = await relevanceModelManager.predictRelevance(
-                        distance: variableManager.calculateDistance(origin: poi),
+                        distance: distance,
                         speed: variableManager.currentSpeed(),
                         weather: variableManager.currentWeather(),
                         isOpen: open,
@@ -115,6 +116,7 @@ class ContentViewModel: ObservableObject {
                 } else {
                     print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
                 }
+
         }
     }
     

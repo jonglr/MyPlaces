@@ -3,4 +3,27 @@
    uuid = "71D0B432-A3EF-4B80-8A3B-633420CBC986"
    type = "1"
    version = "2.0">
+   <Breakpoints>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.AddressBreakpoint">
+         <BreakpointContent
+            uuid = "FC3F294D-1755-4155-97A8-BAA43AE72D98"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            symbolName = "*0x104d88e00">
+            <Locations>
+               <Location
+                  uuid = "FC3F294D-1755-4155-97A8-BAA43AE72D98 - 42ce7c15bf45202b"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "dyld3::MachOFile::analyzeSegmentsLayout(unsigned long long&amp;, bool&amp;) const"
+                  moduleName = "dyld"
+                  usesParentBreakpointCondition = "Yes">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+   </Breakpoints>
 </Bucket>

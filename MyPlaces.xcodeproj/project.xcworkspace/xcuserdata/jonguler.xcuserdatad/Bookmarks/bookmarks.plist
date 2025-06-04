@@ -12,13 +12,13 @@
 					<key>EndingColumnNumber</key>
 					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>119</string>
+					<string>308</string>
 					<key>StartingColumnNumber</key>
 					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>118</string>
+					<string>308</string>
 					<key>Timestamp</key>
-					<string>770635992.4563611</string>
+					<string>770714819.396841</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -34,17 +34,13 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>                //return self.envTypeToDouble(from: desc as! String)
-</string>
+				<string></string>
 				<key>leading</key>
-				<string>            for feature in result.features() {
-                let desc = feature.attributes["DESC_VAL"]
+				<string>        
+}
 </string>
 				<key>trailing</key>
-				<string>                return 1.0
-            }
-        } catch {
-</string>
+				<string></string>
 			</dict>
 			<key>type</key>
 			<string>bookmark</string>
@@ -57,13 +53,13 @@
 					<key>EndingColumnNumber</key>
 					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>81</string>
+					<string>83</string>
 					<key>StartingColumnNumber</key>
 					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>81</string>
+					<string>83</string>
 					<key>Timestamp</key>
-					<string>770635825.070497</string>
+					<string>770643398.104265</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -143,13 +139,13 @@
 					<key>EndingColumnNumber</key>
 					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>99</string>
+					<string>103</string>
 					<key>StartingColumnNumber</key>
-					<string>0</string>
+					<string>77</string>
 					<key>StartingLineNumber</key>
-					<string>98</string>
+					<string>102</string>
 					<key>Timestamp</key>
-					<string>770636030.820758</string>
+					<string>770647288.713975</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -165,16 +161,61 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>                    let open = variableManager.isOpen(otherTags: poi.attributes["other_tags"] as! String)
+				<string>
 </string>
 				<key>leading</key>
-				<string>                    /// get the attribute value pairs
-                    let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
-</string>
-				<key>trailing</key>
 				<string>                    
                     /// compute the relevance Score
-                    let score = await relevanceModelManager.predictRelevance(
+                    let score = await relevanceModelManager.predictRelevance(</string>
+				<key>trailing</key>
+				<string>                        distance: distance,
+                        speed: variableManager.currentSpeed(),
+                        weather: variableManager.currentWeather(),
+</string>
+			</dict>
+			<key>type</key>
+			<string>bookmark</string>
+		</dict>
+		<dict>
+			<key>destination</key>
+			<dict>
+				<key>location-parameters</key>
+				<dict>
+					<key>EndingColumnNumber</key>
+					<string>0</string>
+					<key>EndingLineNumber</key>
+					<string>92</string>
+					<key>StartingColumnNumber</key>
+					<string>68</string>
+					<key>StartingLineNumber</key>
+					<string>91</string>
+					<key>Timestamp</key>
+					<string>770647315.065886</string>
+				</dict>
+				<key>rebasable-url</key>
+				<dict>
+					<key>base</key>
+					<string>workspace</string>
+					<key>payload</key>
+					<dict>
+						<key>relative-path</key>
+						<string>MyPlaces/Managers/DataManager.swift</string>
+					</dict>
+				</dict>
+			</dict>
+			<key>text-context</key>
+			<dict>
+				<key>focused</key>
+				<string>
+</string>
+				<key>leading</key>
+				<string>        
+        do {
+            guard let poi = try context.fetch(poiFetch).first else {</string>
+				<key>trailing</key>
+				<string>                print("No POI found for Saving the Relevance Score with ID: \(poiID)")
+                return
+            }
 </string>
 			</dict>
 			<key>type</key>

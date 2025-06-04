@@ -154,7 +154,8 @@ class DataManager: ObservableObject {
     
     func getPOIInteraction(poiID: UUID, context: NSManagedObjectContext) -> (isFavorite: Bool, clickCount: Int32, lastClickedDate: Date) {
         guard let poi = fetchPOI(poiID: poiID, context: context) else {
-            print("POI not found to retrieve interactions.")
+            /// If POI not found to retrieve interactions
+            print("No interactions with this POI yet.")
             return (false, 0, Calendar.current.date(byAdding: .day, value: -600, to: Date()) ?? Date())
         }
         let fallbackDate = Calendar.current.date(byAdding: .day, value: -600, to: Date()) ?? Date()
