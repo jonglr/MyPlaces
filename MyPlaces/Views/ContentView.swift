@@ -29,32 +29,41 @@ struct ContentView: View {
     
     // MARK: - Initialization
     init() {
-        /// Create a PortalItem of the vector basemap
         let basemapItemDay = PortalItem(
             portal: .arcGISOnline(connection: .authenticated),
             id: Item.ID("56987f73d2b44570960d8a8f67bbe104")!
-        )
-        let irrelevantPOIItem = PortalItem(
-            portal: .arcGISOnline(connection: .authenticated),
-            id: Item.ID("e725091c0dba4234a420736052397e2b")!
         )
         let basemapItemNight = PortalItem(
             portal: .arcGISOnline(connection: .authenticated),
             id: Item.ID("f2ac67c0a5564cdc90f29585354e6163")!
         )
-        /// Make a Vector Tiled Layer from the portal items
         let vtl_basemap_day = ArcGISVectorTiledLayer(item: basemapItemDay)
         let vtl_basemap_night = ArcGISVectorTiledLayer(item: basemapItemNight)
-        let fl_irrelevantPOI = FeatureLayer(item: irrelevantPOIItem)
-        /// Build a Basemap containing the vector tile layer
-        self.basemap_day = Basemap(baseLayers: [vtl_basemap_day])
-        self.basemap_night = Basemap(baseLayers: [vtl_basemap_night])
-        /// Finally, create the Map
+        let basemap_day = Basemap(baseLayers: [vtl_basemap_day])
+        let basemap_night = Basemap(baseLayers: [vtl_basemap_night])
+        self.basemap_day = basemap_day
+        self.basemap_night = basemap_night
+
         let initialMap = Map(basemap: basemap_day)
-        /// Assign it to @State variable
+        let irrelevantPOIItem = PortalItem(
+            portal: .arcGISOnline(connection: .authenticated),
+            id: Item.ID("e725091c0dba4234a420736052397e2b")!
+        )
+        let fl_irrelevantPOI = FeatureLayer(item: irrelevantPOIItem)
+        initialMap.addOperationalLayer(fl_irrelevantPOI)
+        
         self._map = State(initialValue: initialMap)
-        /// Add the Irrelevant POIs as an overlay layer
+    }
+    
+    private func createMap(using basemap: Basemap) -> Map {
+        let map = Map(basemap: basemap)
+        let irrelevantPOIItem = PortalItem(
+            portal: .arcGISOnline(connection: .authenticated),
+            id: Item.ID("e725091c0dba4234a420736052397e2b")!
+        )
+        let fl_irrelevantPOI = FeatureLayer(item: irrelevantPOIItem)
         map.addOperationalLayer(fl_irrelevantPOI)
+        return map
     }
     
     /// Variables for the location display & related states
@@ -73,7 +82,6 @@ struct ContentView: View {
     
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            // MAP LAYER
             MapViewReader { proxy in
                 MapView(map: map)
                     .locationDisplay(locationDisplay)
@@ -109,7 +117,6 @@ struct ContentView: View {
                         
                         if let resultPopup = identifyResult?.popups.first {
                             popup = resultPopup
-                            
                             /// Extract the ArcGIS feature and record a click
                             if let feature = resultPopup.geoElement as? ArcGISFeature {
                                 viewModel.recordPOIClick(poi: feature)
@@ -137,15 +144,13 @@ struct ContentView: View {
                     .onAppear {
                         /// Build a FeatureCollectionLayer from the processed POI features
                         let fcLayer = buildFeatureCollectionLayer(from: viewModel.displayedPOIs)
-                        
                         /// Add it to the map’s operational layers
                         DispatchQueue.main.async {
                             map.addOperationalLayer(fcLayer)
                         }
                     }
                     .onChange(of: settingsManager.isDarkMode) {
-                        print("Dark mode changed:", settingsManager.isDarkMode)
-                        map.basemap = settingsManager.isDarkMode ? basemap_night : basemap_day
+                        map = createMap(using: settingsManager.isDarkMode ? basemap_night : basemap_day)
                     }
             }
             // TOGGLE OVERLAY

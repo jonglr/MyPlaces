@@ -12,133 +12,6 @@
 					<key>EndingColumnNumber</key>
 					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>308</string>
-					<key>StartingColumnNumber</key>
-					<string>0</string>
-					<key>StartingLineNumber</key>
-					<string>308</string>
-					<key>Timestamp</key>
-					<string>770714819.396841</string>
-				</dict>
-				<key>rebasable-url</key>
-				<dict>
-					<key>base</key>
-					<string>workspace</string>
-					<key>payload</key>
-					<dict>
-						<key>relative-path</key>
-						<string>MyPlaces/Managers/VariableManager.swift</string>
-					</dict>
-				</dict>
-			</dict>
-			<key>text-context</key>
-			<dict>
-				<key>focused</key>
-				<string></string>
-				<key>leading</key>
-				<string>        
-}
-</string>
-				<key>trailing</key>
-				<string></string>
-			</dict>
-			<key>type</key>
-			<string>bookmark</string>
-		</dict>
-		<dict>
-			<key>destination</key>
-			<dict>
-				<key>location-parameters</key>
-				<dict>
-					<key>EndingColumnNumber</key>
-					<string>0</string>
-					<key>EndingLineNumber</key>
-					<string>83</string>
-					<key>StartingColumnNumber</key>
-					<string>0</string>
-					<key>StartingLineNumber</key>
-					<string>83</string>
-					<key>Timestamp</key>
-					<string>770643398.104265</string>
-				</dict>
-				<key>rebasable-url</key>
-				<dict>
-					<key>base</key>
-					<string>workspace</string>
-					<key>payload</key>
-					<dict>
-						<key>relative-path</key>
-						<string>MyPlaces/Models/POIModel.swift</string>
-					</dict>
-				</dict>
-			</dict>
-			<key>text-context</key>
-			<dict>
-				<key>focused</key>
-				<string></string>
-				<key>leading</key>
-				<string>    }
-}
-</string>
-				<key>trailing</key>
-				<string></string>
-			</dict>
-			<key>type</key>
-			<string>bookmark</string>
-		</dict>
-		<dict>
-			<key>destination</key>
-			<dict>
-				<key>location-parameters</key>
-				<dict>
-					<key>EndingColumnNumber</key>
-					<string>0</string>
-					<key>EndingLineNumber</key>
-					<string>148</string>
-					<key>StartingColumnNumber</key>
-					<string>0</string>
-					<key>StartingLineNumber</key>
-					<string>147</string>
-					<key>Timestamp</key>
-					<string>770623301.791746</string>
-				</dict>
-				<key>rebasable-url</key>
-				<dict>
-					<key>base</key>
-					<string>workspace</string>
-					<key>payload</key>
-					<dict>
-						<key>relative-path</key>
-						<string>MyPlaces/Views/ContentView.swift</string>
-					</dict>
-				</dict>
-			</dict>
-			<key>text-context</key>
-			<dict>
-				<key>focused</key>
-				<string>                        map.basemap = settingsManager.isDarkMode ? basemap_night : basemap_day
-</string>
-				<key>leading</key>
-				<string>                    .onChange(of: settingsManager.isDarkMode) {
-                        print("Dark mode changed:", settingsManager.isDarkMode)
-</string>
-				<key>trailing</key>
-				<string>                    }
-            }
-            // TOGGLE OVERLAY
-</string>
-			</dict>
-			<key>type</key>
-			<string>bookmark</string>
-		</dict>
-		<dict>
-			<key>destination</key>
-			<dict>
-				<key>location-parameters</key>
-				<dict>
-					<key>EndingColumnNumber</key>
-					<string>0</string>
-					<key>EndingLineNumber</key>
 					<string>103</string>
 					<key>StartingColumnNumber</key>
 					<string>77</string>
@@ -182,15 +55,15 @@
 				<key>location-parameters</key>
 				<dict>
 					<key>EndingColumnNumber</key>
-					<string>0</string>
+					<string>29</string>
 					<key>EndingLineNumber</key>
-					<string>92</string>
+					<string>143</string>
 					<key>StartingColumnNumber</key>
-					<string>68</string>
+					<string>21</string>
 					<key>StartingLineNumber</key>
-					<string>91</string>
+					<string>143</string>
 					<key>Timestamp</key>
-					<string>770647315.065886</string>
+					<string>770722368.7473201</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -199,23 +72,66 @@
 					<key>payload</key>
 					<dict>
 						<key>relative-path</key>
-						<string>MyPlaces/Managers/DataManager.swift</string>
+						<string>MyPlaces/Views/ContentView.swift</string>
 					</dict>
 				</dict>
 			</dict>
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>
-</string>
+				<string>onAppear</string>
 				<key>leading</key>
-				<string>        
-        do {
-            guard let poi = try context.fetch(poiFetch).first else {</string>
+				<string>                    .alert("Location display failed to start", isPresented: $failedToStart) {}
+                
+                    .</string>
 				<key>trailing</key>
-				<string>                print("No POI found for Saving the Relevance Score with ID: \(poiID)")
-                return
-            }
+				<string> {
+                        /// Build a FeatureCollectionLayer from the processed POI features
+                        let fcLayer = buildFeatureCollectionLayer(from: viewModel.displayedPOIs)
+</string>
+			</dict>
+			<key>type</key>
+			<string>bookmark</string>
+		</dict>
+		<dict>
+			<key>destination</key>
+			<dict>
+				<key>location-parameters</key>
+				<dict>
+					<key>EndingColumnNumber</key>
+					<string>29</string>
+					<key>EndingLineNumber</key>
+					<string>151</string>
+					<key>StartingColumnNumber</key>
+					<string>21</string>
+					<key>StartingLineNumber</key>
+					<string>151</string>
+					<key>Timestamp</key>
+					<string>770722378.593734</string>
+				</dict>
+				<key>rebasable-url</key>
+				<dict>
+					<key>base</key>
+					<string>workspace</string>
+					<key>payload</key>
+					<dict>
+						<key>relative-path</key>
+						<string>MyPlaces/Views/ContentView.swift</string>
+					</dict>
+				</dict>
+			</dict>
+			<key>text-context</key>
+			<dict>
+				<key>focused</key>
+				<string>onChange</string>
+				<key>leading</key>
+				<string>                        }
+                    }
+                    .</string>
+				<key>trailing</key>
+				<string>(of: settingsManager.isDarkMode) {
+                        map = createMap(using: settingsManager.isDarkMode ? basemap_night : basemap_day)
+                    }
 </string>
 			</dict>
 			<key>type</key>

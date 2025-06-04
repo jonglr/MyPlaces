@@ -84,27 +84,34 @@ class DataManager: ObservableObject {
             print("User does not have a valid ID to save Relevance Score")
             return
         }
-        let poiFetch: NSFetchRequest<POI> = POI.fetchRequest()
-        poiFetch.predicate = NSPredicate(format: "poiID == %@", poiID as CVarArg)
-        poiFetch.fetchLimit = 1
-        
+
         do {
-            guard let poi = try context.fetch(poiFetch).first else {
-                print("No POI found for Saving the Relevance Score with ID: \(poiID)")
-                return
+            // Fetch or create the POI
+            let poiFetch: NSFetchRequest<POI> = POI.fetchRequest()
+            poiFetch.predicate = NSPredicate(format: "poiID == %@", poiID as CVarArg)
+            poiFetch.fetchLimit = 1
+            let poi: POI
+            
+            if let existingPOI = try context.fetch(poiFetch).first {
+                poi = existingPOI
+            } else {
+                // Create a new POI if it doesn't exist
+                poi = POI(context: context)
+                poi.poiID = poiID
+                poi.favorite = false
+                poi.clickCount = 0
+                poi.lastClickedDate = nil
             }
-            
-            // Fetch any existing relevance score
+
+            // Fetch existing relevance score
             let fetchRequest: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "poiID == %@ AND user.id == %@", poiID as CVarArg, userID as CVarArg)
-            
+            fetchRequest.predicate = NSPredicate(format: "poiID == %@ AND userID == %@", poiID as CVarArg, userID as CVarArg)
+
             let existingScores = try context.fetch(fetchRequest)
-            
+
             if let existingScore = existingScores.first {
-                // Update
                 existingScore.score = score
             } else {
-                // Create
                 let newScore = RelevanceScore(context: context)
                 newScore.userID = userID
                 newScore.poiID = poiID
@@ -112,8 +119,8 @@ class DataManager: ObservableObject {
                 newScore.user = user
                 newScore.poi = poi
             }
-            
-            try! context.save()
+
+            try context.save()
             print("Relevance score saved for POI \(poiID) and User \(userID).")
         } catch {
             print("Error saving relevance score: \(error.localizedDescription)")
