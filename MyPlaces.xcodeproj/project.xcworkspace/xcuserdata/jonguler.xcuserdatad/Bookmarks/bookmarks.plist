@@ -55,15 +55,15 @@
 				<key>location-parameters</key>
 				<dict>
 					<key>EndingColumnNumber</key>
-					<string>29</string>
+					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>143</string>
+					<string>209</string>
 					<key>StartingColumnNumber</key>
-					<string>21</string>
+					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>143</string>
+					<string>209</string>
 					<key>Timestamp</key>
-					<string>770722368.7473201</string>
+					<string>771157268.376792</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -79,16 +79,13 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>onAppear</string>
+				<string></string>
 				<key>leading</key>
-				<string>                    .alert("Location display failed to start", isPresented: $failedToStart) {}
-                
-                    .</string>
-				<key>trailing</key>
-				<string> {
-                        /// Build a FeatureCollectionLayer from the processed POI features
-                        let fcLayer = buildFeatureCollectionLayer(from: viewModel.displayedPOIs)
+				<string>        ]
+    }
 </string>
+				<key>trailing</key>
+				<string></string>
 			</dict>
 			<key>type</key>
 			<string>bookmark</string>
@@ -99,15 +96,15 @@
 				<key>location-parameters</key>
 				<dict>
 					<key>EndingColumnNumber</key>
-					<string>29</string>
+					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>151</string>
+					<string>209</string>
 					<key>StartingColumnNumber</key>
-					<string>21</string>
+					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>151</string>
+					<string>209</string>
 					<key>Timestamp</key>
-					<string>770722378.593734</string>
+					<string>771157268.376819</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -123,16 +120,54 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>onChange</string>
+				<string></string>
 				<key>leading</key>
-				<string>                        }
-                    }
-                    .</string>
-				<key>trailing</key>
-				<string>(of: settingsManager.isDarkMode) {
-                        map = createMap(using: settingsManager.isDarkMode ? basemap_night : basemap_day)
-                    }
+				<string>        ]
+    }
 </string>
+				<key>trailing</key>
+				<string></string>
+			</dict>
+			<key>type</key>
+			<string>bookmark</string>
+		</dict>
+		<dict>
+			<key>destination</key>
+			<dict>
+				<key>location-parameters</key>
+				<dict>
+					<key>EndingColumnNumber</key>
+					<string>0</string>
+					<key>EndingLineNumber</key>
+					<string>209</string>
+					<key>StartingColumnNumber</key>
+					<string>0</string>
+					<key>StartingLineNumber</key>
+					<string>209</string>
+					<key>Timestamp</key>
+					<string>771157268.3768311</string>
+				</dict>
+				<key>rebasable-url</key>
+				<dict>
+					<key>base</key>
+					<string>workspace</string>
+					<key>payload</key>
+					<dict>
+						<key>relative-path</key>
+						<string>MyPlaces/Views/ContentView.swift</string>
+					</dict>
+				</dict>
+			</dict>
+			<key>text-context</key>
+			<dict>
+				<key>focused</key>
+				<string></string>
+				<key>leading</key>
+				<string>        ]
+    }
+</string>
+				<key>trailing</key>
+				<string></string>
 			</dict>
 			<key>type</key>
 			<string>bookmark</string>

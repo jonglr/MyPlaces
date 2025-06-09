@@ -72,9 +72,7 @@ struct ContentView: View {
     
     /// Variables for the pop-up logic
     @State private var identifyScreenPoint: CGPoint?
-    @State private var popup: Popup? {
-        didSet { showPopup = popup != nil }
-    }
+    @State private var popup: Popup?
     @State private var showPopup = false
     @State private var floatingPanelDetent: FloatingPanelDetent = .full
     
@@ -107,16 +105,16 @@ struct ContentView: View {
                     }
                 /// Identify the tapped feature
                     .task(id: identifyScreenPoint) {
-                        guard let identifyScreenPoint else { return }
+                        guard let identifyScreenPoint,
+                              let identifyResult = try? await proxy.identifyLayers(
+                                screenPoint: identifyScreenPoint,
+                                tolerance: 10,
+                                returnPopupsOnly: true
+                              ) else { return }
                         
-                        let identifyResult = try? await proxy.identifyLayers(
-                            screenPoint: identifyScreenPoint,
-                            tolerance: 10,
-                            returnPopupsOnly: true
-                        ).first
-                        
-                        if let resultPopup = identifyResult?.popups.first {
-                            popup = resultPopup
+                        if let resultPopup = identifyResult.first?.popups.first {
+                            self.popup = resultPopup
+                            self.showPopup = self.popup != nil
                             /// Extract the ArcGIS feature and record a click
                             if let feature = resultPopup.geoElement as? ArcGISFeature {
                                 viewModel.recordPOIClick(poi: feature)
@@ -129,14 +127,10 @@ struct ContentView: View {
                         selectedDetent: $floatingPanelDetent,
                         horizontalAlignment: .leading,
                         isPresented: $showPopup
-                    ) {
-                        if let safePopup = popup {
-                            PopupView(popup: safePopup, isPresented: $showPopup)
-                                .showCloseButton(true)
-                                .padding()
-                        } else {
-                            Text("No feature found").padding()
-                        }
+                    ) { [popup] in
+                        PopupView(popup: popup!, isPresented: $showPopup)
+                            .showCloseButton(true)
+                            .padding()
                     }
                 /// In case location fails
                     .alert("Location display failed to start", isPresented: $failedToStart) {}

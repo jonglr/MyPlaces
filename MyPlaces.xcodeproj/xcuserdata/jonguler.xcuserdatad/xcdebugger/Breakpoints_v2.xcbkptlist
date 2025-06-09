@@ -14,11 +14,11 @@
             symbolName = "*0x104d88e00">
             <Locations>
                <Location
-                  uuid = "FC3F294D-1755-4155-97A8-BAA43AE72D98 - 42ce7c15bf45202b"
+                  uuid = "FC3F294D-1755-4155-97A8-BAA43AE72D98 - 891ba36c43b5e9cd"
                   shouldBeEnabled = "Yes"
                   ignoreCount = "0"
                   continueAfterRunningActions = "No"
-                  symbolName = "dyld3::MachOFile::analyzeSegmentsLayout(unsigned long long&amp;, bool&amp;) const"
+                  symbolName = "*0x104d88e00"
                   moduleName = "dyld"
                   usesParentBreakpointCondition = "Yes">
                </Location>
