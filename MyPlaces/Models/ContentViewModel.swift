@@ -66,7 +66,9 @@ class ContentViewModel: ObservableObject {
             let scores = try context.fetch(request)
             print (scores)
             let filteredPOIs = poiModel?.POIs.filter { poi in
-                guard let poiID = poi.attributes["id"] as? UUID else { return false }
+                guard let fidAny = poi.attributes["fid"],
+                      let fid = (fidAny as? NSNumber)?.int64Value else { return false }
+                let poiID = variableManager.uuidFromFID(fid)
                 return scores.contains(where: { $0.poiID == poiID })
             } ?? []
             /// publish the POIs
@@ -113,6 +115,7 @@ class ContentViewModel: ObservableObject {
                     )
                     /// Safe the Relevance Score
                     dataManager.saveRelevanceScore(for: poiID, score: score)
+                    print("Predicted relevance score for \(poiID): \(score)")
                 } else {
                     print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
                 }

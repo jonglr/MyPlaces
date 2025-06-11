@@ -19,7 +19,6 @@ struct ContentView: View {
     
     /// Keep a reference to the ContentViewModel
     @StateObject private var viewModel = ContentViewModel()
-    
     @EnvironmentObject var settingsManager: SettingsManager
     
     /// Initialize a map variable
@@ -135,16 +134,21 @@ struct ContentView: View {
                 /// In case location fails
                     .alert("Location display failed to start", isPresented: $failedToStart) {}
                 
-                    .onAppear {
-                        /// Build a FeatureCollectionLayer from the processed POI features
-                        let fcLayer = buildFeatureCollectionLayer(from: viewModel.displayedPOIs)
-                        /// Add it to the map’s operational layers
-                        DispatchQueue.main.async {
-                            map.addOperationalLayer(fcLayer)
-                        }
-                    }
                     .onChange(of: settingsManager.isDarkMode) {
                         map = createMap(using: settingsManager.isDarkMode ? basemap_night : basemap_day)
+                    }
+                    .onReceive(viewModel.$displayedPOIs) { newPOIs in
+                        let newLayer = buildFeatureCollectionLayer(from: newPOIs)
+                        DispatchQueue.main.async {
+                            // Clear existing relevant POI layers before adding new one
+                            let existingLayers = map.operationalLayers
+                            for layer in existingLayers {
+                                if let fcLayer = layer as? FeatureCollectionLayer {
+                                    map.removeOperationalLayer(fcLayer)
+                                }
+                            }
+                            map.addOperationalLayer(newLayer)
+                        }
                     }
             }
             // TOGGLE OVERLAY
@@ -165,7 +169,9 @@ struct ContentView: View {
     private func buildFeatureCollectionLayer(from features: [ArcGISFeature]) -> FeatureCollectionLayer {
         /// Create a new FeatureCollectionTable
         let collectionTable = FeatureCollectionTable(
-            fields: makeFields()
+            fields: makeFields(),
+            geometryType: Point.self,
+            spatialReference: .wgs84
         )
         let desiredNames = makeFields().map { $0.name }
         
@@ -174,13 +180,13 @@ struct ContentView: View {
             do {
                 for oldFeature in features {
                     var filteredAttributes = [String: Any]()
-                    /// Filter out the attribute columns that won't be neccessary
                     for key in desiredNames {
                         if let value = oldFeature.attributes[key] {
                             filteredAttributes[key] = value
                         }
                     }
-                    try await collectionTable.add(oldFeature)
+                    let newFeature = collectionTable.makeFeature(attributes: filteredAttributes, geometry: oldFeature.geometry)
+                    try await collectionTable.add(newFeature)
                 }
             } catch {
                 print("Failed adding rows: \(error)")
