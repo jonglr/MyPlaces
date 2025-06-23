@@ -55,12 +55,6 @@ struct ContentView: View {
         self._map = State(initialValue: initialMap)
     }
     
-    private func createMap(using basemap: Basemap) -> Map {
-        let map = Map(basemap: basemap)
-        map.addOperationalLayer(self.irrelevantPOIs)
-        return map
-    }
-    
     /// Variables for the location display & related states
     @State private var locationDisplay = LocationDisplay(dataSource: SystemLocationDataSource())
     @State private var failedToStart = false
@@ -130,8 +124,10 @@ struct ContentView: View {
                 /// In case location fails
                     .alert("Location display failed to start", isPresented: $failedToStart) {}
                 
-                    .onChange(of: settingsManager.isDarkMode) {
-                        map = createMap(using: settingsManager.isDarkMode ? basemap_night : basemap_day)
+                    .onChange(of: settingsManager.isNightMode) {
+                        withAnimation {
+                            map.basemap = settingsManager.isNightMode ? basemap_night : basemap_day
+                        }
                     }
                     .onReceive(viewModel.$displayedPOIs) { newPOIs in
                         // Extract the IDs of the relevant POIs
@@ -145,9 +141,6 @@ struct ContentView: View {
                         // Convert the list of IDs into a comma-separated string
                         let idString = ids.map { String($0) }.joined(separator: ",")
                         let definitionExpression = "fid IN (\(idString))"
-                        
-                        // Define the ID of the filtered POI layer to track
-                        let filteredPOIItemID = Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
 
                         // Load the original layer from ArcGIS Online
                         let portalItem = PortalItem(
@@ -164,7 +157,7 @@ struct ContentView: View {
                             for layer in map.operationalLayers {
                                 if let fl = layer as? FeatureLayer,
                                    let existingItemID = fl.item?.id,
-                                   existingItemID == filteredPOIItemID {
+                                   existingItemID == portalItem.id {
                                     map.removeOperationalLayer(fl)
                                 }
                             }
@@ -172,15 +165,32 @@ struct ContentView: View {
                         }
                     }
             }
-            // TOGGLE OVERLAY
-            Toggle(isOn: $settingsManager.isDarkMode) {
-                Image(systemName: settingsManager.isDarkMode ? "moon.fill" : "sun.max.fill")
+            HStack {
+                Spacer()
+                
+                ZStack {
+                    // Background icons
+                    HStack {
+                        Image(systemName: "sun.max.fill")
+                            .scaleEffect(0.8)
+                        Spacer()
+                        Image(systemName: "moon.fill")
+                            .scaleEffect(0.8)
+                    }
                     .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    
+                    // Actual toggle
+                    Toggle("", isOn: $settingsManager.isNightMode)
+                        .labelsHidden()
+                        .toggleStyle(SwitchToggleStyle(tint: .clear)) // Disable default blue tint
+                }
+                .frame(width: 55)
+                .background(Color.black.opacity(0.4))
+                .cornerRadius(16)
+                .padding(.top, 16)
+                .padding(.trailing, 16)
             }
-            .padding()
-            .background(Color.black.opacity(0.6))
-            .cornerRadius(10)
-            .padding()
         }
     }
 }

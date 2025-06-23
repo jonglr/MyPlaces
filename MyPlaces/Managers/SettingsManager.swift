@@ -14,7 +14,7 @@ import CoreData
 import SwiftUI
 
 class SettingsManager: ObservableObject {
-    @Published var isDarkMode: Bool = false
+    @Published var isNightMode: Bool = false
 
     static let shared = DataManager(context: PersistenceController.shared.container.viewContext)
     private let context: NSManagedObjectContext
