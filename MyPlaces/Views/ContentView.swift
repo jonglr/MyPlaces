@@ -25,6 +25,7 @@ struct ContentView: View {
     @State private var map: Map
     private let basemap_day: Basemap
     private let basemap_night: Basemap
+    private let irrelevantPOIs: FeatureLayer
     
     // MARK: - Initialization
     init() {
@@ -48,20 +49,15 @@ struct ContentView: View {
             portal: .arcGISOnline(connection: .authenticated),
             id: Item.ID("e725091c0dba4234a420736052397e2b")!
         )
-        let fl_irrelevantPOI = FeatureLayer(item: irrelevantPOIItem)
-        initialMap.addOperationalLayer(fl_irrelevantPOI)
+        self.irrelevantPOIs = FeatureLayer(item: irrelevantPOIItem)
+        initialMap.addOperationalLayer(irrelevantPOIs)
         
         self._map = State(initialValue: initialMap)
     }
     
     private func createMap(using basemap: Basemap) -> Map {
         let map = Map(basemap: basemap)
-        let irrelevantPOIItem = PortalItem(
-            portal: .arcGISOnline(connection: .authenticated),
-            id: Item.ID("e725091c0dba4234a420736052397e2b")!
-        )
-        let fl_irrelevantPOI = FeatureLayer(item: irrelevantPOIItem)
-        map.addOperationalLayer(fl_irrelevantPOI)
+        map.addOperationalLayer(self.irrelevantPOIs)
         return map
     }
     
@@ -96,7 +92,7 @@ struct ContentView: View {
                         }
                         do {
                             try await locationDisplay.dataSource.start()
-                            locationDisplay.initialZoomScale = 40_000
+                            locationDisplay.initialZoomScale = 10_000
                             locationDisplay.autoPanMode = .recenter
                         } catch {
                             self.failedToStart = true
@@ -138,16 +134,41 @@ struct ContentView: View {
                         map = createMap(using: settingsManager.isDarkMode ? basemap_night : basemap_day)
                     }
                     .onReceive(viewModel.$displayedPOIs) { newPOIs in
-                        let newLayer = buildFeatureCollectionLayer(from: newPOIs)
+                        // Extract the IDs of the relevant POIs
+                        let ids: [Int64] = newPOIs.compactMap {
+                            if let fid = $0.attributes["fid"] as? NSNumber {
+                                return fid.int64Value
+                            }
+                            return nil
+                        }
+
+                        // Convert the list of IDs into a comma-separated string
+                        let idString = ids.map { String($0) }.joined(separator: ",")
+                        let definitionExpression = "fid IN (\(idString))"
+                        
+                        // Define the ID of the filtered POI layer to track
+                        let filteredPOIItemID = Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
+
+                        // Load the original layer from ArcGIS Online
+                        let portalItem = PortalItem(
+                            portal: .arcGISOnline(connection: .authenticated),
+                            id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
+                        )
+                        let filteredLayer = FeatureLayer(item: portalItem)
+
+                        // Apply the filter
+                        filteredLayer.definitionExpression = definitionExpression
+
+                        // Remove any existing filtered layers
                         DispatchQueue.main.async {
-                            // Clear existing relevant POI layers before adding new one
-                            let existingLayers = map.operationalLayers
-                            for layer in existingLayers {
-                                if let fcLayer = layer as? FeatureCollectionLayer {
-                                    map.removeOperationalLayer(fcLayer)
+                            for layer in map.operationalLayers {
+                                if let fl = layer as? FeatureLayer,
+                                   let existingItemID = fl.item?.id,
+                                   existingItemID == filteredPOIItemID {
+                                    map.removeOperationalLayer(fl)
                                 }
                             }
-                            map.addOperationalLayer(newLayer)
+                            map.addOperationalLayer(filteredLayer)
                         }
                     }
             }
