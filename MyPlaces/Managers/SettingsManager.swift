@@ -15,12 +15,29 @@ import SwiftUI
 
 class SettingsManager: ObservableObject {
     @Published var isNightMode: Bool = false
-
+    @Published var user: UserProfile
+    
+    @Published var theme: String {
+        didSet {
+            DataManager.shared.saveTheme(theme: theme)
+            user.theme = theme
+            try? context.save()
+            
+        }
+    }
+    
     static let shared = DataManager(context: PersistenceController.shared.container.viewContext)
     private let context: NSManagedObjectContext
     
     init(context: NSManagedObjectContext) {
         self.context = context
+        let user = DataManager.shared.currentUser()!
+        self.user = user
+        self.theme = user.theme ?? "explore" /// default fallback
+    }
+    
+    func switchTheme(to newTheme: String) {
+        self.theme = newTheme /// triggers didSet
     }
     
     func switchUser(withID id: UUID) -> UserProfile {

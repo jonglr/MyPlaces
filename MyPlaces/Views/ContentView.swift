@@ -17,17 +17,32 @@ import CoreLocation
 
 struct ContentView: View {
     
+    // MARK: - Initialization
+    
     /// Keep a reference to the ContentViewModel
     @StateObject private var viewModel = ContentViewModel()
     @EnvironmentObject var settingsManager: SettingsManager
-    
+
     /// Initialize a map variable
     @State private var map: Map
     private let basemap_day: Basemap
     private let basemap_night: Basemap
     private let irrelevantPOIs: FeatureLayer
     
-    // MARK: - Initialization
+    /// Variables for the location display & related states
+    @State private var locationDisplay = LocationDisplay(dataSource: SystemLocationDataSource())
+    @State private var failedToStart = false
+    
+    /// Variables for the pop-up logic
+    @State private var identifyScreenPoint: CGPoint?
+    @State private var popup: Popup?
+    @State private var showPopup = false
+    @State private var floatingPanelDetent: FloatingPanelDetent = .half
+    
+    @State private var selectedTheme: ThemeCategory = .explore
+    
+    //@State private var viewExtent: Envelope?
+    
     init() {
         let basemapItemDay = PortalItem(
             portal: .arcGISOnline(connection: .authenticated),
@@ -55,141 +70,194 @@ struct ContentView: View {
         self._map = State(initialValue: initialMap)
     }
     
-    /// Variables for the location display & related states
-    @State private var locationDisplay = LocationDisplay(dataSource: SystemLocationDataSource())
-    @State private var failedToStart = false
-    
-    /// Variables for the pop-up logic
-    @State private var identifyScreenPoint: CGPoint?
-    @State private var popup: Popup?
-    @State private var showPopup = false
-    @State private var floatingPanelDetent: FloatingPanelDetent = .full
+    /// Possible themes for the theme picker element
+    enum ThemeCategory: String, CaseIterable, Identifiable {
+        var id: String { self.rawValue }
+
+        case culture
+        case explore
+        case food
+        case outdoor
+        case publicTransport = "public transport"
+        case shopping
+    }
     
     // MARK: - Body
     
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            MapViewReader { proxy in
-                MapView(map: map)
-                    .locationDisplay(locationDisplay)
-                
-                /// Single tap gesture to identify layers
-                    .onSingleTapGesture { screenPoint, _ in
-                        identifyScreenPoint = screenPoint
-                    }
-                
-                /// Start location display
-                    .task {
-                        let locationManager = CLLocationManager()
-                        if locationManager.authorizationStatus == .notDetermined {
-                            locationManager.requestWhenInUseAuthorization()
-                        }
-                        do {
-                            try await locationDisplay.dataSource.start()
-                            locationDisplay.initialZoomScale = 10_000
-                            locationDisplay.autoPanMode = .recenter
-                        } catch {
-                            self.failedToStart = true
-                        }
-                    }
-                /// Identify the tapped feature
-                    .task(id: identifyScreenPoint) {
-                        guard let identifyScreenPoint,
-                              let identifyResult = try? await proxy.identifyLayers(
-                                screenPoint: identifyScreenPoint,
-                                tolerance: 10,
-                                returnPopupsOnly: true
-                              ) else { return }
-                        
-                        if let resultPopup = identifyResult.first?.popups.first {
-                            self.popup = resultPopup
-                            self.showPopup = self.popup != nil
-                            /// Extract the ArcGIS feature and record a click
-                            if let feature = resultPopup.geoElement as? ArcGISFeature {
-                                viewModel.recordPOIClick(poi: feature)
-                                print("Feature clicked: \(feature.attributes["osm_id"] as! String)")
-                            }
-                        }
-                    }
-                /// Floating panel for pop-ups
-                    .floatingPanel(
-                        selectedDetent: $floatingPanelDetent,
-                        horizontalAlignment: .leading,
-                        isPresented: $showPopup
-                    ) { [popup] in
-                        PopupView(popup: popup!, isPresented: $showPopup)
-                            .showCloseButton(true)
-                            .padding()
-                    }
-                /// In case location fails
-                    .alert("Location display failed to start", isPresented: $failedToStart) {}
-                
-                    .onChange(of: settingsManager.isNightMode) {
-                        withAnimation {
-                            map.basemap = settingsManager.isNightMode ? basemap_night : basemap_day
-                        }
-                    }
-                    .onReceive(viewModel.$displayedPOIs) { newPOIs in
-                        // Extract the IDs of the relevant POIs
-                        let ids: [Int64] = newPOIs.compactMap {
-                            if let fid = $0.attributes["fid"] as? NSNumber {
-                                return fid.int64Value
-                            }
-                            return nil
-                        }
-
-                        // Convert the list of IDs into a comma-separated string
-                        let idString = ids.map { String($0) }.joined(separator: ",")
-                        let definitionExpression = "fid IN (\(idString))"
-
-                        // Load the original layer from ArcGIS Online
-                        let portalItem = PortalItem(
-                            portal: .arcGISOnline(connection: .authenticated),
-                            id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
-                        )
-                        let filteredLayer = FeatureLayer(item: portalItem)
-
-                        // Apply the filter
-                        filteredLayer.definitionExpression = definitionExpression
-
-                        // Remove any existing filtered layers
-                        DispatchQueue.main.async {
-                            for layer in map.operationalLayers {
-                                if let fl = layer as? FeatureLayer,
-                                   let existingItemID = fl.item?.id,
-                                   existingItemID == portalItem.id {
-                                    map.removeOperationalLayer(fl)
-                                }
-                            }
-                            map.addOperationalLayer(filteredLayer)
-                        }
-                    }
-            }
-            HStack {
-                Spacer()
-                
-                ZStack {
-                    // Background icons
-                    HStack {
-                        Image(systemName: "sun.max.fill")
-                            .scaleEffect(0.8)
-                        Spacer()
-                        Image(systemName: "moon.fill")
-                            .scaleEffect(0.8)
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    
-                    // Actual toggle
-                    Toggle("", isOn: $settingsManager.isNightMode)
-                        .labelsHidden()
-                        .toggleStyle(SwitchToggleStyle(tint: .clear)) // Disable default blue tint
+            mapLayer
+            toggleOverlay
+            themePicker
+        }
+    }
+    
+    private var mapLayer: some View {
+        MapViewReader { proxy in
+            MapView(map: map)
+                .locationDisplay(locationDisplay)
+            
+            /// Single tap gesture to identify layers
+                .onSingleTapGesture { screenPoint, _ in
+                    identifyScreenPoint = screenPoint
                 }
-                .frame(width: 55)
-                .background(Color.black.opacity(0.4))
-                .cornerRadius(16)
-                .padding(.top, 16)
-                .padding(.trailing, 16)
+            
+            /// Start location display
+                .task {
+                    let locationManager = CLLocationManager()
+                    if locationManager.authorizationStatus == .notDetermined {
+                        locationManager.requestWhenInUseAuthorization()
+                    }
+                    do {
+                        try await locationDisplay.dataSource.start()
+                        locationDisplay.initialZoomScale = 10_000
+                        locationDisplay.autoPanMode = .recenter
+                    } catch {
+                        self.failedToStart = true
+                    }
+                }
+            /// Identify the tapped feature
+                .task(id: identifyScreenPoint) {
+                    guard let identifyScreenPoint,
+                          let identifyResult = try? await proxy.identifyLayers(
+                            screenPoint: identifyScreenPoint,
+                            tolerance: 10,
+                            returnPopupsOnly: true
+                          ) else { return }
+                    
+                    if let resultPopup = identifyResult.first?.popups.first {
+                        self.popup = resultPopup
+                        self.showPopup = self.popup != nil
+                        /// Extract the ArcGIS feature and record a click
+                        if let feature = resultPopup.geoElement as? ArcGISFeature {
+                            viewModel.recordPOIClick(poi: feature)
+                            print("Feature clicked: \(feature.attributes["osm_id"] as! String)")
+                        }
+                    }
+                }
+            /// Floating panel for pop-ups
+                .floatingPanel(
+                    selectedDetent: $floatingPanelDetent,
+                    horizontalAlignment: .leading,
+                    isPresented: $showPopup
+                ) { [popup] in
+                    PopupView(popup: popup!, isPresented: $showPopup)
+                        .showCloseButton(true)
+                        .padding()
+                }
+            /// In case location fails
+                .alert("Location display failed to start", isPresented: $failedToStart) {}
+            
+                .onChange(of: settingsManager.isNightMode) {
+                    withAnimation {
+                        map.basemap = settingsManager.isNightMode ? basemap_night : basemap_day
+                    }
+                }
+                .onReceive(viewModel.$displayedPOIs) { newPOIs in
+                    // Extract the IDs of the relevant POIs
+                    let ids: [Int64] = newPOIs.compactMap {
+                        if let fid = $0.attributes["fid"] as? NSNumber {
+                            return fid.int64Value
+                        }
+                        return nil
+                    }
+                    
+                    // Convert the list of IDs into a comma-separated string
+                    let idString = ids.map { String($0) }.joined(separator: ",")
+                    let definitionExpression = "fid IN (\(idString))"
+                    
+                    // Load the original layer from ArcGIS Online
+                    let portalItem = PortalItem(
+                        portal: .arcGISOnline(connection: .authenticated),
+                        id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
+                    )
+                    let filteredLayer = FeatureLayer(item: portalItem)
+                    
+                    // Apply the filter
+                    filteredLayer.definitionExpression = definitionExpression
+                    
+                    // Remove any existing filtered layers
+                    DispatchQueue.main.async {
+                        for layer in map.operationalLayers {
+                            if let fl = layer as? FeatureLayer,
+                               let existingItemID = fl.item?.id,
+                               existingItemID == portalItem.id {
+                                map.removeOperationalLayer(fl)
+                            }
+                        }
+                        map.addOperationalLayer(filteredLayer)
+                    }
+                }
+                .onChange(of: settingsManager.theme) {
+                    Task {
+                        await viewModel.updateRelevance()
+                        await viewModel.loadRelevanceScores()
+                    }
+                }
+        }
+    }
+        
+    private var toggleOverlay: some View {
+        HStack {
+            Spacer()
+            ZStack {
+                /// Background icons
+                HStack {
+                    Image(systemName: "sun.max.fill")
+                        .scaleEffect(0.7)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Image(systemName: "moon.fill")
+                        .scaleEffect(0.7)
+                        .foregroundColor(.gray)
+                }
+                .padding(.horizontal, 16)
+
+                /// Actual toggle
+                Toggle("", isOn: $settingsManager.isNightMode)
+                    .labelsHidden()
+                    .toggleStyle(SwitchToggleStyle(tint: .clear))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity) // Full overlay
+            }
+            .frame(width: 50, height: 30) // Match this height to Toggle's actual size
+            .background(.thinMaterial)
+            .cornerRadius(16)
+            .padding(.top, 16)
+            .padding(.trailing, 16)
+            .clipped() // Ensure content stays within corners
+        }
+    }
+    
+    private var themeSelectionPicker: some View {
+        Picker("Theme", selection: $selectedTheme) {
+            ForEach(ThemeCategory.allCases) { theme in
+                Text(theme.rawValue.capitalized)
+                    .tag(theme)
+            }
+        }
+        .pickerStyle(.menu)
+        .onChange(of: selectedTheme) {
+            settingsManager.switchTheme(to: selectedTheme.rawValue)
+        }
+    }
+    
+    private var themePicker: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Text("Theme:")
+                    .foregroundColor(.white)
+
+                themeSelectionPicker
+                    .padding(8)
+                    .background(.thinMaterial)
+                    .cornerRadius(8)
+            }
+            .padding()
+        }
+        .onAppear {
+            if let category = ThemeCategory(rawValue: settingsManager.theme) {
+                selectedTheme = category
             }
         }
     }

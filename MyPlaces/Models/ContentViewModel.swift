@@ -30,6 +30,12 @@ class ContentViewModel: ObservableObject {
     private let variableManager = VariableManager()
     private let relevanceModelManager = RelevanceModelManager()
     private let thematicModelManager = ThematicModelManager()
+    
+    /// Search Attributes
+    let graphicsOverlay = GraphicsOverlay()
+    let locator = LocatorTask(
+        url: URL(string: "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer")!
+    )
   
     
     // MARK: - Initialization
@@ -132,15 +138,11 @@ class ContentViewModel: ObservableObject {
     
     // MARK: - User Interactions
     
-    func changeTheme(theme: String) {
-        dataManager.saveTheme(theme: theme)
-    }
-    
     func markPOIAsFavorite(poi: ArcGISFeature) {
         if let fidAny = poi.attributes["fid"],
            let fid = (fidAny as? NSNumber)?.int64Value {
             let poiID = variableManager.uuidFromFID(fid)
-            DataManager.shared.updatePOIInteraction(poiID: poiID, context: context, isFavorite: true)
+            dataManager.updatePOIInteraction(poiID: poiID, context: context, isFavorite: true)
         }
     }
         
@@ -148,7 +150,7 @@ class ContentViewModel: ObservableObject {
         if let fidAny = poi.attributes["fid"],
            let fid = (fidAny as? NSNumber)?.int64Value {
             let poiID = variableManager.uuidFromFID(fid)
-            DataManager.shared.updatePOIInteraction(poiID: poiID, context: context)
+            dataManager.updatePOIInteraction(poiID: poiID, context: context)
         }
     }
     

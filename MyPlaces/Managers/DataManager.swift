@@ -56,7 +56,6 @@ class DataManager: ObservableObject {
             print("No valid user found.")
             return
         }
-        
         user.theme = theme
         try! context.save()
         print("Theme saved successfully: \(theme)")
