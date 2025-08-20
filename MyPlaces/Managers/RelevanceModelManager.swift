@@ -30,7 +30,10 @@ class RelevanceModelManager {
         clickCount: Double,
         lastClickedDate: Double,
         theme: Double,
-        fclass: Double)
+        fclass: Double,
+        hasName: Double,
+        hasOpeningHours: Double
+    )
     -> Double {
         let input = RelevanceInput(
             distance: distance,
@@ -41,7 +44,9 @@ class RelevanceModelManager {
             clickCount: clickCount,
             lastClickedDate: lastClickedDate,
             theme: theme,
-            fclass: fclass
+            fclass: fclass,
+            hasName: hasName,
+            hasOpeningHours: hasOpeningHours
         )
         
         do {

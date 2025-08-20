@@ -67,7 +67,7 @@ class ContentViewModel: ObservableObject {
         }
         let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
         /// Load the POIs with the scores higher than 0.5
-        request.predicate = NSPredicate(format: "user == %@ AND score > 0.5", user)
+        request.predicate = NSPredicate(format: "user == %@ AND score > 0.6", user)
         do {
             let scores = try context.fetch(request)
             print (scores)
@@ -104,8 +104,9 @@ class ContentViewModel: ObservableObject {
                     
                     /// get the attributes for the score computation ot the poi
                     let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
-                    let open = variableManager.isOpen(otherTags: poi.attributes["other_tags"] as! String)
+                    let (open, hasOpeningHours) = variableManager.isOpen(otherTags: poi.attributes["other_tags"] as! String)
                     let distance = variableManager.calculateDistance(origin: poi)
+                    let hasName = variableManager.hasName(poi: poi)
                     
                     /// compute the relevance Score
                     let score = await relevanceModelManager.predictRelevance(
@@ -117,7 +118,9 @@ class ContentViewModel: ObservableObject {
                         clickCount: clickCount,
                         lastClickedDate: daysAgo,
                         theme: variableManager.currentUserTheme(),
-                        fclass: fclass
+                        fclass: fclass,
+                        hasName: hasName,
+                        hasOpeningHours: hasOpeningHours
                     )
                     /// Safe the Relevance Score
                     dataManager.saveRelevanceScore(for: poiID, score: score)

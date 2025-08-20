@@ -183,8 +183,9 @@ class VariableManager {
     
     // MARK: - POI Details
     
-    /// Calculates, if the current day and time is in the opening hours of the poi attribute, 1:is open, 0: is closed (default value)
-    func isOpen(otherTags: String) -> Double {
+    /// Calculates, if the POI has opening hours (1 = yes, 0=no) and if the current day and time is in the opening hours of the poi attribute, 1:is open, 0: is closed (default value)
+    func isOpen(otherTags: String) -> (isOpen: Double, hasOpeningHours: Double) {
+        
         /// Extract the string from opening_hours
         let tags = otherTags
             .split(separator: ",")
@@ -200,7 +201,7 @@ class VariableManager {
         }
         
         /// If no hours found, assume closed
-        guard let hours = openingHours else { return 0.0 }
+        guard let hours = openingHours else { return (0.0, 0.0)}
         
         /// Parse current weekday and time
         let now = Date()
@@ -215,7 +216,7 @@ class VariableManager {
         let weekdayMap = [
             "Mon": "Mo", "Tue": "Tu", "Wed": "We", "Thu": "Th", "Fri": "Fr", "Sat": "Sa", "Sun": "Su"
         ]
-        guard let normalizedDay = weekdayMap[currentDay] else { return 0.0 }
+        guard let normalizedDay = weekdayMap[currentDay] else { return (0.0, 1.0)}
         
         /// Check if current day & time match any defined range
         let entries = hours.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }
@@ -257,11 +258,11 @@ class VariableManager {
                 if timeParts.count == 2,
                    currentTime >= timeParts[0],
                    currentTime <= timeParts[1] {
-                    return 1.0
+                    return (1.0, 1.0)
                 }
             }
         }
-        return 0.0
+        return (0.0, 1.0)
     }
     
     /// Calculates the distance between the current location of the user and the POI Feature
@@ -303,6 +304,14 @@ class VariableManager {
         let daysAgo = Double(components.day ?? 0)
         
         return (isFavorite, clickCount, daysAgo)
+    }
+    
+    func hasName (poi: Feature) -> Double {
+        let name = poi.attributes["name"]
+        if name != nil {
+            return 1.0
+        }
+        return 0.0
     }
         
 }
