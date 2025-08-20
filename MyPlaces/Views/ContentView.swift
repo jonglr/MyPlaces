@@ -15,6 +15,44 @@ import ArcGIS
 import ArcGISToolkit
 import CoreLocation
 
+// MARK: - Graphics for Search
+
+private class Model: ObservableObject {
+
+let graphicsOverlay: GraphicsOverlay
+
+let locator = LocatorTask(
+    url: URL(string: "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer")!
+)
+
+let textGraphic: Graphic = {
+    let textSymbol = TextSymbol(
+        text: "",
+        color: .black,
+        size: 14,
+        horizontalAlignment: .center,
+        verticalAlignment: .bottom
+    )
+    textSymbol.backgroundColor = .white
+    return Graphic(symbol: textSymbol)
+}()
+
+let markerGraphic: Graphic = {
+    let markerSymbol = SimpleMarkerSymbol(
+        style: .square,
+        color: .red,
+        size: 14
+    )
+    return Graphic(symbol: markerSymbol)
+}()
+
+init() {
+    graphicsOverlay = GraphicsOverlay(graphics: [textGraphic, markerGraphic])
+}
+
+}
+
+
 struct ContentView: View {
     
     // MARK: - Initialization
@@ -22,7 +60,7 @@ struct ContentView: View {
     /// Keep a reference to the ContentViewModel
     @StateObject private var viewModel = ContentViewModel()
     @EnvironmentObject var settingsManager: SettingsManager
-
+    
     /// Initialize a map variable
     @State private var map: Map
     private let basemap_day: Basemap
@@ -41,6 +79,9 @@ struct ContentView: View {
     
     @State private var selectedTheme: ThemeCategory = .explore
     
+    @StateObject private var model = Model()
+    @State private var searchText: String = ""
+    
     //@State private var viewExtent: Envelope?
     
     init() {
@@ -58,7 +99,7 @@ struct ContentView: View {
         let basemap_night = Basemap(baseLayers: [vtl_basemap_night])
         self.basemap_day = basemap_day
         self.basemap_night = basemap_night
-
+        
         let initialMap = Map(basemap: basemap_day)
         let irrelevantPOIItem = PortalItem(
             portal: .arcGISOnline(connection: .authenticated),
@@ -73,7 +114,7 @@ struct ContentView: View {
     /// Possible themes for the theme picker element
     enum ThemeCategory: String, CaseIterable, Identifiable {
         var id: String { self.rawValue }
-
+        
         case culture
         case explore
         case food
@@ -82,7 +123,31 @@ struct ContentView: View {
         case shopping
     }
     
-    // MARK: - Body
+    // MARK: - Geocode Function
+    
+    private func geocode(with searchText: String, proxy: MapViewProxy) async throws {
+        let parameters = GeocodeParameters()
+        parameters.addResultAttributeName("*")
+        parameters.maxResults = 1
+        parameters.outputSpatialReference = map.spatialReference
+        
+        let geocodeResults = try await model.locator.geocode(forSearchText: searchText, using: parameters)
+        if let firstResult = geocodeResults.first,
+           let location = firstResult.displayLocation,
+           let symbol = model.textGraphic.symbol as? TextSymbol {
+            
+            model.markerGraphic.geometry = location
+            model.textGraphic.geometry = location
+            symbol.text = firstResult.label
+            
+            // Recenter map to current user location instead of geocode location
+            if let userLocation = locationDisplay.mapLocation {
+                await proxy.setViewpointCenter(userLocation, scale: 10000)
+            }
+        }
+    }
+    
+    // MARK: - View Body
     
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -94,109 +159,126 @@ struct ContentView: View {
     
     private var mapLayer: some View {
         MapViewReader { proxy in
-            MapView(map: map)
-                .locationDisplay(locationDisplay)
-            
-            /// Single tap gesture to identify layers
-                .onSingleTapGesture { screenPoint, _ in
-                    identifyScreenPoint = screenPoint
-                }
-            
-            /// Start location display
-                .task {
-                    let locationManager = CLLocationManager()
-                    if locationManager.authorizationStatus == .notDetermined {
-                        locationManager.requestWhenInUseAuthorization()
+            ZStack(alignment: .topTrailing) {
+                MapView(map: map)
+                    .locationDisplay(locationDisplay)
+                
+                /// Single tap gesture to identify layers
+                    .onSingleTapGesture { screenPoint, _ in
+                        identifyScreenPoint = screenPoint
                     }
-                    do {
-                        try await locationDisplay.dataSource.start()
-                        locationDisplay.initialZoomScale = 10_000
-                        locationDisplay.autoPanMode = .recenter
-                    } catch {
-                        self.failedToStart = true
-                    }
-                }
-            /// Identify the tapped feature
-                .task(id: identifyScreenPoint) {
-                    guard let identifyScreenPoint,
-                          let identifyResult = try? await proxy.identifyLayers(
-                            screenPoint: identifyScreenPoint,
-                            tolerance: 10,
-                            returnPopupsOnly: true
-                          ) else { return }
-                    
-                    if let resultPopup = identifyResult.first?.popups.first {
-                        self.popup = resultPopup
-                        self.showPopup = self.popup != nil
-                        /// Extract the ArcGIS feature and record a click
-                        if let feature = resultPopup.geoElement as? ArcGISFeature {
-                            viewModel.recordPOIClick(poi: feature)
-                            print("Feature clicked: \(feature.attributes["osm_id"] as! String)")
+                
+                /// Start location display
+                    .task {
+                        let locationManager = CLLocationManager()
+                        if locationManager.authorizationStatus == .notDetermined {
+                            locationManager.requestWhenInUseAuthorization()
+                        }
+                        do {
+                            try await locationDisplay.dataSource.start()
+                            locationDisplay.initialZoomScale = 10_000
+                            locationDisplay.autoPanMode = .recenter
+                        } catch {
+                            self.failedToStart = true
                         }
                     }
-                }
-            /// Floating panel for pop-ups
-                .floatingPanel(
-                    selectedDetent: $floatingPanelDetent,
-                    horizontalAlignment: .leading,
-                    isPresented: $showPopup
-                ) { [popup] in
-                    PopupView(popup: popup!, isPresented: $showPopup)
-                        .showCloseButton(true)
-                        .padding()
-                }
-            /// In case location fails
-                .alert("Location display failed to start", isPresented: $failedToStart) {}
-            
-                .onChange(of: settingsManager.isNightMode) {
-                    withAnimation {
-                        map.basemap = settingsManager.isNightMode ? basemap_night : basemap_day
-                    }
-                }
-                .onReceive(viewModel.$displayedPOIs) { newPOIs in
-                    // Extract the IDs of the relevant POIs
-                    let ids: [Int64] = newPOIs.compactMap {
-                        if let fid = $0.attributes["fid"] as? NSNumber {
-                            return fid.int64Value
-                        }
-                        return nil
-                    }
-                    
-                    // Convert the list of IDs into a comma-separated string
-                    let idString = ids.map { String($0) }.joined(separator: ",")
-                    let definitionExpression = "fid IN (\(idString))"
-                    
-                    // Load the original layer from ArcGIS Online
-                    let portalItem = PortalItem(
-                        portal: .arcGISOnline(connection: .authenticated),
-                        id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
-                    )
-                    let filteredLayer = FeatureLayer(item: portalItem)
-                    
-                    // Apply the filter
-                    filteredLayer.definitionExpression = definitionExpression
-                    
-                    // Remove any existing filtered layers
-                    DispatchQueue.main.async {
-                        for layer in map.operationalLayers {
-                            if let fl = layer as? FeatureLayer,
-                               let existingItemID = fl.item?.id,
-                               existingItemID == portalItem.id {
-                                map.removeOperationalLayer(fl)
+                /// Identify the tapped feature
+                    .task(id: identifyScreenPoint) {
+                        guard let identifyScreenPoint,
+                              let identifyResult = try? await proxy.identifyLayers(
+                                screenPoint: identifyScreenPoint,
+                                tolerance: 10,
+                                returnPopupsOnly: true
+                              ) else { return }
+                        
+                        if let resultPopup = identifyResult.first?.popups.first {
+                            self.popup = resultPopup
+                            self.showPopup = self.popup != nil
+                            /// Extract the ArcGIS feature and record a click
+                            if let feature = resultPopup.geoElement as? ArcGISFeature {
+                                viewModel.recordPOIClick(poi: feature)
+                                print("Feature clicked: \(feature.attributes["osm_id"] as! String)")
                             }
                         }
-                        map.addOperationalLayer(filteredLayer)
                     }
-                }
-                .onChange(of: settingsManager.theme) {
-                    Task {
-                        await viewModel.updateRelevance()
-                        await viewModel.loadRelevanceScores()
+                /// Floating panel for pop-ups
+                    .floatingPanel(
+                        selectedDetent: $floatingPanelDetent,
+                        horizontalAlignment: .leading,
+                        isPresented: $showPopup
+                    ) { [popup] in
+                        PopupView(popup: popup!, isPresented: $showPopup)
+                            .showCloseButton(true)
+                            .padding()
                     }
+                /// In case location fails
+                    .alert("Location display failed to start", isPresented: $failedToStart) {}
+                
+                    .onChange(of: settingsManager.isNightMode) {
+                        withAnimation {
+                            map.basemap = settingsManager.isNightMode ? basemap_night : basemap_day
+                        }
+                    }
+                    .onReceive(viewModel.$displayedPOIs) { newPOIs in
+                        // Extract the IDs of the relevant POIs
+                        let ids: [Int64] = newPOIs.compactMap {
+                            if let fid = $0.attributes["fid"] as? NSNumber {
+                                return fid.int64Value
+                            }
+                            return nil
+                        }
+                        
+                        // Convert the list of IDs into a comma-separated string
+                        let idString = ids.map { String($0) }.joined(separator: ",")
+                        let definitionExpression = "fid IN (\(idString))"
+                        
+                        // Load the original layer from ArcGIS Online
+                        let portalItem = PortalItem(
+                            portal: .arcGISOnline(connection: .authenticated),
+                            id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
+                        )
+                        let filteredLayer = FeatureLayer(item: portalItem)
+                        
+                        // Apply the filter
+                        filteredLayer.definitionExpression = definitionExpression
+                        
+                        // Remove any existing filtered layers
+                        DispatchQueue.main.async {
+                            for layer in map.operationalLayers {
+                                if let fl = layer as? FeatureLayer,
+                                   let existingItemID = fl.item?.id,
+                                   existingItemID == portalItem.id {
+                                    map.removeOperationalLayer(fl)
+                                }
+                            }
+                            map.addOperationalLayer(filteredLayer)
+                        }
+                    }
+                    .onChange(of: settingsManager.theme) {
+                        Task {
+                            await viewModel.updateRelevance()
+                            await viewModel.loadRelevanceScores()
+                        }
+                    }
+                VStack {
+                    HStack {
+                        TextField("Enter address", text: $searchText)
+                        Spacer()
+                        Button("Search") {
+                            Task {
+                                try await geocode(with: searchText, proxy: proxy)
+                            }
+                        }
+                    }
+                    .padding(EdgeInsets(top: 60, leading: 10, bottom: 10, trailing: 10))
+                    .background(.thinMaterial, ignoresSafeAreaEdges: .horizontal)
+                    
+                    Spacer()
                 }
+            }
         }
     }
-        
+    
     private var toggleOverlay: some View {
         HStack {
             Spacer()
@@ -212,7 +294,7 @@ struct ContentView: View {
                         .foregroundColor(.gray)
                 }
                 .padding(.horizontal, 16)
-
+                
                 /// Actual toggle
                 Toggle("", isOn: $settingsManager.isNightMode)
                     .labelsHidden()
@@ -247,7 +329,7 @@ struct ContentView: View {
             HStack {
                 Text("Theme:")
                     .foregroundColor(.white)
-
+                
                 themeSelectionPicker
                     .padding(8)
                     .background(.thinMaterial)
@@ -261,7 +343,6 @@ struct ContentView: View {
             }
         }
     }
-}
     
     // MARK: - Build a FeatureCollectionLayer from filtered POIs
     
@@ -312,3 +393,4 @@ struct ContentView: View {
             Field(type: .text, name: "other_tags", alias: "other_tags")
         ]
     }
+}

@@ -12,7 +12,15 @@ import CoreML
 
 class ThematicModelManager {
     private let model: Thematic
-
+    private let themeLookup: [Int: String] = [
+        0: "shopping",
+        1: "food",
+        2: "public transport",
+        3: "culture",
+        4: "outdoor",
+        5: "explore"
+    ]
+    
     init() {
         guard let loadedModel = try? Thematic(configuration: .init()) else {
             fatalError("Failed to load Thematic.mlmodel")
@@ -24,7 +32,11 @@ class ThematicModelManager {
         let input = ThematicInput(environmentType: environmentType, timeOfDay: timeOfDay, dayOfWeek: dayOfWeek)
         do {
             let output = try model.prediction(input: input)
-            return output.classLabel
+            
+            /// Convert the integer output to the corresponding theme string
+            let themeIndex = Int(output.themeLabel) // Assuming themeLabel is a number
+            return themeLookup[themeIndex] ?? "explore" // Return "explore" as fallback
+            
         } catch {
             print("Failed to predict theme: \(error.localizedDescription)")
             return "explore"

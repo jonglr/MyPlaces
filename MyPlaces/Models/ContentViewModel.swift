@@ -67,7 +67,7 @@ class ContentViewModel: ObservableObject {
         }
         let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
         /// Load the POIs with the scores higher than 0.5
-        request.predicate = NSPredicate(format: "user == %@ AND score > 0.6", user)
+        request.predicate = NSPredicate(format: "user == %@ AND score > 0.5", user)
         do {
             let scores = try context.fetch(request)
             print (scores)
