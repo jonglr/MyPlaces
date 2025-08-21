@@ -264,9 +264,16 @@ class VariableManager {
         }
         return (0.0, 1.0)
     }
+
+    /// Calculate distance between two Point geometries
+    func calculateDistance(from point1: Point, to point2: Point) -> Double {
+        let location1 = CLLocation(latitude: point1.y, longitude: point1.x)
+        let location2 = CLLocation(latitude: point2.y, longitude: point2.x)
+        return location1.distance(from: location2) // Returns distance in meters
+    }
     
     /// Calculates the distance between the current location of the user and the POI Feature
-    func calculateDistance(origin poi: ArcGISFeature) -> Double {
+    func calculateDistanceToUser(origin poi: ArcGISFeature) -> Double {
         /// retrieve the location of the user
         guard let point = getCurrentLocationPoint() else { return 360.0 }
         /// Get the POI Geometry and convert into a Point Feature, else return the max kilometer distance of the model training dataset

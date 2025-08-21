@@ -61,27 +61,49 @@ class ContentViewModel: ObservableObject {
     /// Load Relevance Scores and Filter POIs
     @MainActor
     func loadRelevanceScores() async {
-        guard let user = dataManager.currentUser() else {
+        guard dataManager.currentUser() != nil else {
             print("No user logged in.")
             return
         }
+        guard let allPOIs = poiModel?.POIs else {
+            print("POI model not initialized")
+            return
+        }
+        
+        /// Filter POIs that have relevance scores > 0.6
+        let filteredPOIs = allPOIs.filter { poi in
+            let score = getRelevanceScore(for: poi)
+            return score > 0.6
+        }
+        print("Filtered POIs before aggregation: \(filteredPOIs.count)")
+        
+        /// Apply aggregation to remove overlapping POIs
+        let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: filteredPOIs, threshold: 10)
+        print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
+        
+        /// Update displayed POIs
+        self.displayedPOIs = filteredGeneralizedPOIs
+        
+        print("All POIs: \(allPOIs.count) Loaded Relevant POIs: \(displayedPOIs.count)")
+    }
+    
+    /// Helper function to get relevance score for a POI
+    private func getRelevanceScore(for poi: ArcGISFeature) -> Double {
+        guard let user = dataManager.currentUser(),
+              let fidAny = poi.attributes["fid"],
+              let fid = (fidAny as? NSNumber)?.int64Value else { return 0.0 }
+        
+        let poiID = variableManager.uuidFromFID(fid)
+        
         let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
-        /// Load the POIs with the scores higher than 0.5
-        request.predicate = NSPredicate(format: "user == %@ AND score > 0.6", user)
+        request.predicate = NSPredicate(format: "user == %@ AND poiID == %@", user, poiID as CVarArg)
+        
         do {
             let scores = try context.fetch(request)
-            print (scores)
-            let filteredPOIs = poiModel?.POIs.filter { poi in
-                guard let fidAny = poi.attributes["fid"],
-                      let fid = (fidAny as? NSNumber)?.int64Value else { return false }
-                let poiID = variableManager.uuidFromFID(fid)
-                return scores.contains(where: { $0.poiID == poiID })
-            } ?? []
-            /// publish the POIs
-            self.displayedPOIs = filteredPOIs
-            print("All POIs: \(allPOIs.count) Loaded Relevant POIs: \(displayedPOIs.count)")
+            return scores.first?.score ?? 0.0
         } catch {
-            print("Error loading relevance scores: \(error)")
+            print("Error fetching relevance score: \(error)")
+            return 0.0
         }
     }
     
@@ -105,7 +127,7 @@ class ContentViewModel: ObservableObject {
                     /// get the attributes for the score computation ot the poi
                     let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
                     let (open, hasOpeningHours) = variableManager.isOpen(otherTags: poi.attributes["other_tags"] as! String)
-                    let distance = variableManager.calculateDistance(origin: poi)
+                    let distance = variableManager.calculateDistanceToUser(origin: poi)
                     let hasName = variableManager.hasName(poi: poi)
                     
                     /// compute the relevance Score
@@ -157,4 +179,51 @@ class ContentViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Aggregation of Close POIs
+    
+    /// Generalizes close POIs such that the higher POI will be prefered and displayed (Threshold is 50m for a aggregatioon)
+    func filterOverlappingPOIs(pois: [ArcGISFeature], threshold: Double) -> [ArcGISFeature] {
+        var selectedPOIs: [ArcGISFeature] = []
+        var visited = Set<Int64>()
+        
+        for poi in pois {
+            guard let fidAny = poi.attributes["fid"],
+                  let fid = (fidAny as? NSNumber)?.int64Value,
+                  !visited.contains(fid),
+                  let geometry = poi.geometry as? Point else { continue }
+            
+            /// Find POIs within the distance threshold
+            let nearby = pois.filter { other in
+                guard let otherFidAny = other.attributes["fid"],
+                      let otherFid = (otherFidAny as? NSNumber)?.int64Value,
+                      otherFid != fid,
+                      let otherGeometry = other.geometry as? Point,
+                      !visited.contains(otherFid) else { return false }
+                
+                return variableManager.calculateDistance(from: geometry, to: otherGeometry) < threshold
+            }
+            
+            /// Include self in group
+            let group = [poi] + nearby
+            
+            /// Find the POI with highest interest score
+            let mostRelevant = group.max { a, b in
+                let scoreA = getRelevanceScore(for: a)
+                let scoreB = getRelevanceScore(for: b)
+                return scoreA < scoreB
+            }
+            
+            if let best = mostRelevant {
+                selectedPOIs.append(best)
+                /// Mark all POIs in this group as visited
+                for groupPoi in group {
+                    if let groupFidAny = groupPoi.attributes["fid"],
+                       let groupFid = (groupFidAny as? NSNumber)?.int64Value {
+                        visited.insert(groupFid)
+                    }
+                }
+            }
+        }
+        return selectedPOIs
+    }
 }

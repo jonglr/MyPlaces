@@ -56,13 +56,13 @@
 					<key>EndingColumnNumber</key>
 					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>70</string>
+					<string>76</string>
 					<key>StartingColumnNumber</key>
-					<string>83</string>
+					<string>30</string>
 					<key>StartingLineNumber</key>
-					<string>69</string>
+					<string>75</string>
 					<key>Timestamp</key>
-					<string>777380933.384887</string>
+					<string>777472245.759635</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -81,13 +81,13 @@
 				<string>
 </string>
 				<key>leading</key>
-				<string>        let request: NSFetchRequest&lt;RelevanceScore&gt; = RelevanceScore.fetchRequest()
-        /// Load the POIs with the scores higher than 0.5
-        request.predicate = NSPredicate(format: "user == %@ AND score &gt; 0.6", user)</string>
+				<string>        let filteredPOIs = allPOIs.filter { poi in
+            let score = getRelevanceScore(for: poi)
+            return score &gt; 0.6</string>
 				<key>trailing</key>
-				<string>        do {
-            let scores = try context.fetch(request)
-            print (scores)
+				<string>        }
+        print("Filtered POIs before aggregation: \(filteredPOIs.count)")
+        
 </string>
 			</dict>
 			<key>type</key>

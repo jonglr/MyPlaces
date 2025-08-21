@@ -176,7 +176,7 @@ struct ContentView: View {
                         }
                         do {
                             try await locationDisplay.dataSource.start()
-                            locationDisplay.initialZoomScale = 10_000
+                            locationDisplay.initialZoomScale = 2_000
                             locationDisplay.autoPanMode = .recenter
                         } catch {
                             self.failedToStart = true
