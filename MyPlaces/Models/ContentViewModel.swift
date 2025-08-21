@@ -78,7 +78,7 @@ class ContentViewModel: ObservableObject {
         print("Filtered POIs before aggregation: \(filteredPOIs.count)")
         
         /// Apply aggregation to remove overlapping POIs
-        let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: filteredPOIs, threshold: 10)
+        let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: filteredPOIs, threshold: 50)
         print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
         
         /// Update displayed POIs
@@ -181,7 +181,7 @@ class ContentViewModel: ObservableObject {
     
     // MARK: - Aggregation of Close POIs
     
-    /// Generalizes close POIs such that the higher POI will be prefered and displayed (Threshold is 50m for a aggregatioon)
+    /// Generalizes close POIs such that the higher POI will be preferred and displayed
     func filterOverlappingPOIs(pois: [ArcGISFeature], threshold: Double) -> [ArcGISFeature] {
         var selectedPOIs: [ArcGISFeature] = []
         var visited = Set<Int64>()
@@ -200,13 +200,14 @@ class ContentViewModel: ObservableObject {
                       let otherGeometry = other.geometry as? Point,
                       !visited.contains(otherFid) else { return false }
                 
-                return variableManager.calculateDistance(from: geometry, to: otherGeometry) < threshold
+                let distance = GeometryEngine.distance(from: geometry, to: otherGeometry)
+                return distance < threshold
             }
             
             /// Include self in group
             let group = [poi] + nearby
             
-            /// Find the POI with highest interest score
+            /// Find the POI with highest relevance score
             let mostRelevant = group.max { a, b in
                 let scoreA = getRelevanceScore(for: a)
                 let scoreB = getRelevanceScore(for: b)
@@ -215,6 +216,7 @@ class ContentViewModel: ObservableObject {
             
             if let best = mostRelevant {
                 selectedPOIs.append(best)
+                
                 /// Mark all POIs in this group as visited
                 for groupPoi in group {
                     if let groupFidAny = groupPoi.attributes["fid"],
@@ -224,6 +226,7 @@ class ContentViewModel: ObservableObject {
                 }
             }
         }
+        
         return selectedPOIs
     }
 }
