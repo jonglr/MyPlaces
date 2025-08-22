@@ -215,8 +215,24 @@ struct ContentView: View {
                     .alert("Location display failed to start", isPresented: $failedToStart) {}
                 
                     .onChange(of: settingsManager.isNightMode) {
-                        withAnimation {
-                            map.basemap = settingsManager.isNightMode ? basemap_night : basemap_day
+                        print("Switching to \(settingsManager.isNightMode ? "night" : "day") mode")
+                        
+                        DispatchQueue.main.async {
+                            if settingsManager.isNightMode {
+                                let nightItem = PortalItem(
+                                    portal: .arcGISOnline(connection: .authenticated),
+                                    id: Item.ID("f2ac67c0a5564cdc90f29585354e6163")!
+                                )
+                                let nightLayer = ArcGISVectorTiledLayer(item: nightItem)
+                                map.basemap = Basemap(baseLayers: [nightLayer])
+                            } else {
+                                let dayItem = PortalItem(
+                                    portal: .arcGISOnline(connection: .authenticated),
+                                    id: Item.ID("56987f73d2b44570960d8a8f67bbe104")!
+                                )
+                                let dayLayer = ArcGISVectorTiledLayer(item: dayItem)
+                                map.basemap = Basemap(baseLayers: [dayLayer])
+                            }
                         }
                     }
                     .onReceive(viewModel.$displayedPOIs) { newPOIs in
