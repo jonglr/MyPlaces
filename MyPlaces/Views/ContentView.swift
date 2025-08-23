@@ -176,7 +176,7 @@ struct ContentView: View {
                         }
                         do {
                             try await locationDisplay.dataSource.start()
-                            locationDisplay.initialZoomScale = 2_000
+                            locationDisplay.initialZoomScale = 1_500
                             locationDisplay.autoPanMode = .recenter
                         } catch {
                             self.failedToStart = true
@@ -343,9 +343,6 @@ struct ContentView: View {
         VStack {
             Spacer()
             HStack {
-                Text("Theme:")
-                    .foregroundColor(.white)
-                
                 themeSelectionPicker
                     .padding(8)
                     .background(.thinMaterial)

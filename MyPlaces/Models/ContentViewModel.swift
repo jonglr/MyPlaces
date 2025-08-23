@@ -36,7 +36,33 @@ class ContentViewModel: ObservableObject {
     let locator = LocatorTask(
         url: URL(string: "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer")!
     )
-  
+
+    // MARK: - Theme Mapping Helper
+    
+    /// Looks up the corresponding fclasses that match the thematic map choice
+    private lazy var themeMappings: [String: [Double]] = {
+        guard let url = Bundle.main.url(forResource: "theme_mappings", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let mappings = json["themeMappings"] as? [String: [String: Any]] else {
+            print("Failed to load theme mappings")
+            return [:]
+        }
+        
+        var result: [String: [Double]] = [:]
+        for (themeId, themeData) in mappings {
+            if let fclasses = themeData["fclasses"] as? [Double] {
+                result[themeId] = fclasses
+            }
+        }
+        return result
+    }()
+
+    private func getFclassesForTheme(_ theme: Double) -> [Double] {
+        let themeKey = String(Int(theme))
+        return themeMappings[themeKey] ?? []
+    }
+    
     
     // MARK: - Initialization
     
@@ -70,21 +96,73 @@ class ContentViewModel: ObservableObject {
             return
         }
         
-        /// Filter POIs that have relevance scores > 0.6
-        let filteredPOIs = allPOIs.filter { poi in
-            let score = getRelevanceScore(for: poi)
-            return score > 0.6
-        }
-        print("Filtered POIs before aggregation: \(filteredPOIs.count)")
+        /// Get current user theme
+        let currentTheme = variableManager.currentUserTheme()
+        let themeClasses = getFclassesForTheme(currentTheme)
         
-        /// Apply aggregation to remove overlapping POIs
-        let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: filteredPOIs, threshold: 50)
+        /// Filter POIs that have relevance scores > 0.5
+        let relevantPOIs = allPOIs.compactMap { poi -> (poi: ArcGISFeature, score: Double, fclass: Double)? in
+            let score = getRelevanceScore(for: poi)
+            guard score > 0.5 else { return nil }
+            
+            /// Get fclass for thematic filtering
+            guard let fclassRaw = poi.attributes["fclass"] as? String,
+                  let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
+                return nil
+            }
+            
+            return (poi: poi, score: score, fclass: fclass)
+        }
+        print("Filtered POIs before thematic filtering: \(relevantPOIs.count)")
+        
+        /// Separate POIs into themed (match user map theme) and non-themed groups
+        let themedPOIs = relevantPOIs.filter { themeClasses.isEmpty || themeClasses.contains($0.fclass) }
+        let nonThemedPOIs = relevantPOIs.filter { !themeClasses.isEmpty && !themeClasses.contains($0.fclass) }
+        
+        /// Sort both groups by relevance score (highest first)
+        let sortedThemedPOIs = themedPOIs.sorted { $0.score > $1.score }
+        let sortedNonThemedPOIs = nonThemedPOIs.sorted { $0.score > $1.score }
+        
+        /// Calculate balanced counts - use themed POI count as the limit
+        let availableThemedCount = sortedThemedPOIs.count
+        let availableDiscoveryCount = sortedNonThemedPOIs.count
+        
+        /// Take all available themed POIs
+        let selectedThemedPOIs = sortedThemedPOIs
+        
+        /// Take same number of discovery POIs as themed POIs (or all if fewer available)
+        let discoveryTargetCount = min(availableThemedCount, availableDiscoveryCount)
+        let selectedDiscoveryPOIs = Array(sortedNonThemedPOIs.prefix(discoveryTargetCount))
+        
+        /// Combine all selected POIs
+        let combinedPOIs = (selectedThemedPOIs + selectedDiscoveryPOIs).map { $0.poi }
+        
+        print("Themed POIs: \(selectedThemedPOIs.count), Discovery POIs: \(selectedDiscoveryPOIs.count)")
+        print("Total POIs before aggregation: \(combinedPOIs.count)")
+        
+        /// Apply aggregation to remove overlapping POIs with the threshold of 30m
+        let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, threshold: 30)
         print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
         
         /// Update displayed POIs
         self.displayedPOIs = filteredGeneralizedPOIs
         
         print("All POIs: \(allPOIs.count) Loaded Relevant POIs: \(displayedPOIs.count)")
+        print("Current theme: \(currentTheme) (\(getThemeName(currentTheme)))")
+    }
+    
+    /// Helper function to get theme name for logging
+    private func getThemeName(_ theme: Double) -> String {
+        let themeKey = String(Int(theme))
+        guard let url = Bundle.main.url(forResource: "theme_mappings", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let mappings = json["themeMappings"] as? [String: [String: Any]],
+              let themeData = mappings[themeKey],
+              let name = themeData["name"] as? String else {
+            return "Unknown"
+        }
+        return name
     }
     
     /// Helper function to get relevance score for a POI

@@ -40,7 +40,7 @@
         /// Create a bounding box around the user location
 </string>
 				<key>trailing</key>
-				<string>let buffer: Double = 0.008 // ~1km buffer in degrees
+				<string>let buffer: Double = 0.005 // ~1km buffer in degrees
         let envelope = Envelope(
             xMin: userPoint.x - buffer,
 </string>
@@ -56,13 +56,13 @@
 					<key>EndingColumnNumber</key>
 					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>76</string>
+					<string>106</string>
 					<key>StartingColumnNumber</key>
-					<string>30</string>
+					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>75</string>
+					<string>105</string>
 					<key>Timestamp</key>
-					<string>777472245.759635</string>
+					<string>777637505.640739</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -78,16 +78,104 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>
+				<string>            guard score &gt; 0.5 else { return nil }
 </string>
 				<key>leading</key>
-				<string>        let filteredPOIs = allPOIs.filter { poi in
+				<string>        let relevantPOIs = allPOIs.compactMap { poi -&gt; (poi: ArcGISFeature, score: Double, fclass: Double)? in
             let score = getRelevanceScore(for: poi)
-            return score &gt; 0.6</string>
+</string>
 				<key>trailing</key>
-				<string>        }
-        print("Filtered POIs before aggregation: \(filteredPOIs.count)")
+				<string>            
+            /// Get fclass for thematic filtering
+            guard let fclassRaw = poi.attributes["fclass"] as? String,
+</string>
+			</dict>
+			<key>type</key>
+			<string>bookmark</string>
+		</dict>
+		<dict>
+			<key>destination</key>
+			<dict>
+				<key>location-parameters</key>
+				<dict>
+					<key>EndingColumnNumber</key>
+					<string>89</string>
+					<key>EndingLineNumber</key>
+					<string>143</string>
+					<key>StartingColumnNumber</key>
+					<string>80</string>
+					<key>StartingLineNumber</key>
+					<string>143</string>
+					<key>Timestamp</key>
+					<string>777656201.689128</string>
+				</dict>
+				<key>rebasable-url</key>
+				<dict>
+					<key>base</key>
+					<string>workspace</string>
+					<key>payload</key>
+					<dict>
+						<key>relative-path</key>
+						<string>MyPlaces/Models/ContentViewModel.swift</string>
+					</dict>
+				</dict>
+			</dict>
+			<key>text-context</key>
+			<dict>
+				<key>focused</key>
+				<string>threshold</string>
+				<key>leading</key>
+				<string>        
+        /// Apply aggregation to remove overlapping POIs with the threshold of 30m
+        let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, </string>
+				<key>trailing</key>
+				<string>: 30)
+        print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
         
+</string>
+			</dict>
+			<key>type</key>
+			<string>bookmark</string>
+		</dict>
+		<dict>
+			<key>destination</key>
+			<dict>
+				<key>location-parameters</key>
+				<dict>
+					<key>EndingColumnNumber</key>
+					<string>68</string>
+					<key>EndingLineNumber</key>
+					<string>178</string>
+					<key>StartingColumnNumber</key>
+					<string>63</string>
+					<key>StartingLineNumber</key>
+					<string>178</string>
+					<key>Timestamp</key>
+					<string>777656229.110152</string>
+				</dict>
+				<key>rebasable-url</key>
+				<dict>
+					<key>base</key>
+					<string>workspace</string>
+					<key>payload</key>
+					<dict>
+						<key>relative-path</key>
+						<string>MyPlaces/Views/ContentView.swift</string>
+					</dict>
+				</dict>
+			</dict>
+			<key>text-context</key>
+			<dict>
+				<key>focused</key>
+				<string>1_500</string>
+				<key>leading</key>
+				<string>                        do {
+                            try await locationDisplay.dataSource.start()
+                            locationDisplay.initialZoomScale = </string>
+				<key>trailing</key>
+				<string>
+                            locationDisplay.autoPanMode = .recenter
+                        } catch {
 </string>
 			</dict>
 			<key>type</key>
