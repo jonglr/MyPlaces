@@ -40,7 +40,7 @@
         /// Create a bounding box around the user location
 </string>
 				<key>trailing</key>
-				<string>let buffer: Double = 0.005 // ~1km buffer in degrees
+				<string>let buffer: Double = 0.00225 // ~250m buffer in degrees
         let envelope = Envelope(
             xMin: userPoint.x - buffer,
 </string>
@@ -126,10 +126,10 @@
 				<string>threshold</string>
 				<key>leading</key>
 				<string>        
-        /// Apply aggregation to remove overlapping POIs with the threshold of 30m
+        /// Apply aggregation to remove overlapping POIs with the threshold of X meters
         let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, </string>
 				<key>trailing</key>
-				<string>: 30)
+				<string>: 25)
         print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
         
 </string>
@@ -167,15 +167,15 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>1_500</string>
+				<string>e.sta</string>
 				<key>leading</key>
-				<string>                        do {
-                            try await locationDisplay.dataSource.start()
-                            locationDisplay.initialZoomScale = </string>
+				<string>                        }
+                        do {
+                            try await locationDisplay.dataSourc</string>
 				<key>trailing</key>
-				<string>
+				<string>rt()
+                            locationDisplay.initialZoomScale = 1_500
                             locationDisplay.autoPanMode = .recenter
-                        } catch {
 </string>
 			</dict>
 			<key>type</key>

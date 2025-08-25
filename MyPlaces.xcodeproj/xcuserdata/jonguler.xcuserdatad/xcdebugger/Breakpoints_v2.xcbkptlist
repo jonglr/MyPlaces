@@ -14,11 +14,11 @@
             symbolName = "*0x104d88e00">
             <Locations>
                <Location
-                  uuid = "FC3F294D-1755-4155-97A8-BAA43AE72D98 - 891ba36c43b5e9cd"
+                  uuid = "FC3F294D-1755-4155-97A8-BAA43AE72D98 - bb37e489a81ac8be"
                   shouldBeEnabled = "Yes"
                   ignoreCount = "0"
                   continueAfterRunningActions = "No"
-                  symbolName = "*0x104d88e00"
+                  symbolName = "dyld4::APIs::_dyld_register_dlsym_notifier(dyld4::ReadOnlyCallback&lt;void (*)(char const*)&gt;)"
                   moduleName = "dyld"
                   usesParentBreakpointCondition = "Yes">
                </Location>

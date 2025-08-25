@@ -57,8 +57,12 @@ class DataManager: ObservableObject {
             return
         }
         user.theme = theme
-        try! context.save()
-        print("Theme saved successfully: \(theme)")
+        do {
+            try context.save()
+            print("Theme saved successfully")
+        } catch {
+            print("Error saving relevance score: \(error.localizedDescription)")
+        }
     }
         
     /// Fetch Theme for the User
@@ -94,35 +98,47 @@ class DataManager: ObservableObject {
             if let existingPOI = try context.fetch(poiFetch).first {
                 poi = existingPOI
             } else {
-                // Create a new POI if it doesn't exist
+                /// Create a new POI if it doesn't exist
                 poi = POI(context: context)
                 poi.poiID = poiID
                 poi.favorite = false
                 poi.clickCount = 0
                 poi.lastClickedDate = nil
+                
+                /// Save the POI first before establishing relationships
+                try context.save()
             }
 
-            // Fetch existing relevance score
+            /// Fetch existing relevance score
             let fetchRequest: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "poiID == %@ AND userID == %@", poiID as CVarArg, userID as CVarArg)
+            fetchRequest.fetchLimit = 1  /// Add fetch limit for efficiency
 
             let existingScores = try context.fetch(fetchRequest)
 
             if let existingScore = existingScores.first {
+                /// Update existing score
                 existingScore.score = score
             } else {
                 let newScore = RelevanceScore(context: context)
                 newScore.userID = userID
                 newScore.poiID = poiID
                 newScore.score = score
-                newScore.user = user
-                newScore.poi = poi
+                
+                /// Only set relationships if objects are not nil
+                if user.managedObjectContext != nil {
+                    newScore.user = user
+                }
+                if poi.managedObjectContext != nil {
+                    newScore.poi = poi
+                }
             }
 
             try context.save()
             print("Relevance score saved for POI \(poiID) and User \(userID).")
         } catch {
             print("Error saving relevance score: \(error.localizedDescription)")
+            context.rollback()
         }
     }
        

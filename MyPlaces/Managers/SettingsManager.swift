@@ -37,6 +37,7 @@ class SettingsManager: ObservableObject {
     }
     
     func switchTheme(to newTheme: String) {
+        guard newTheme != self.theme else { return }
         self.theme = newTheme /// triggers didSet
     }
     

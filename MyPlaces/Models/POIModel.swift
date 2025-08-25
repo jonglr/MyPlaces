@@ -52,7 +52,7 @@ class POIModel {
         }
         
         /// Create a bounding box around the user location
-        let buffer: Double = 0.005 // ~1km buffer in degrees
+        let buffer: Double = 0.00225 // ~250m buffer in degrees
         let envelope = Envelope(
             xMin: userPoint.x - buffer,
             yMin: userPoint.y - buffer,

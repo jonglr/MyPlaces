@@ -60,6 +60,7 @@ struct ContentView: View {
     /// Keep a reference to the ContentViewModel
     @StateObject private var viewModel = ContentViewModel()
     @EnvironmentObject var settingsManager: SettingsManager
+    @EnvironmentObject var dataManager: DataManager
     
     /// Initialize a map variable
     @State private var map: Map
@@ -198,6 +199,7 @@ struct ContentView: View {
                             if let feature = resultPopup.geoElement as? ArcGISFeature {
                                 viewModel.recordPOIClick(poi: feature)
                                 print("Feature clicked: \(feature.attributes["osm_id"] as! String)")
+                                print("Relevance Score of POI Feature: ", feature.attributes["relevanceScore"] ?? -1)
                             }
                         }
                     }
@@ -334,8 +336,11 @@ struct ContentView: View {
             }
         }
         .pickerStyle(.menu)
-        .onChange(of: selectedTheme) {
-            settingsManager.switchTheme(to: selectedTheme.rawValue)
+        .onReceive(settingsManager.$theme.dropFirst()) { _ in
+            Task {
+                await viewModel.updateRelevance()
+                await viewModel.loadRelevanceScores()
+            }
         }
     }
     
@@ -351,9 +356,16 @@ struct ContentView: View {
             .padding()
         }
         .onAppear {
-            if let category = ThemeCategory(rawValue: settingsManager.theme) {
+            /// Align UI with the persisted theme
+            let persistedTheme = dataManager.fetchTheme() ?? settingsManager.theme
+            if let category = ThemeCategory(rawValue: persistedTheme) {
                 selectedTheme = category
             }
+            /// Ensure global settings reflect the persisted theme to prevent mismatch
+            settingsManager.switchTheme(to: persistedTheme)
+        }
+        .onChange(of: selectedTheme) {
+            settingsManager.switchTheme(to: selectedTheme.rawValue)
         }
     }
     

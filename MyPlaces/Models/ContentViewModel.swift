@@ -140,8 +140,8 @@ class ContentViewModel: ObservableObject {
         print("Themed POIs: \(selectedThemedPOIs.count), Discovery POIs: \(selectedDiscoveryPOIs.count)")
         print("Total POIs before aggregation: \(combinedPOIs.count)")
         
-        /// Apply aggregation to remove overlapping POIs with the threshold of 30m
-        let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, threshold: 30)
+        /// Apply aggregation to remove overlapping POIs with the threshold of X meters
+        let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, threshold: 25)
         print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
         
         /// Update displayed POIs
@@ -222,8 +222,10 @@ class ContentViewModel: ObservableObject {
                         hasName: hasName,
                         hasOpeningHours: hasOpeningHours
                     )
-                    /// Safe the Relevance Score
-                    dataManager.saveRelevanceScore(for: poiID, score: score)
+                    /// Simple main thread dispatch
+                    await MainActor.run {
+                        dataManager.saveRelevanceScore(for: poiID, score: score)
+                    }
                     print("Predicted relevance score for \(poiID): \(score)")
                 } else {
                     print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
