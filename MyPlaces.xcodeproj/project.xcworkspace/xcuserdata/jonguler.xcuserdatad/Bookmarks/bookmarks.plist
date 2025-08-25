@@ -143,15 +143,15 @@
 				<key>location-parameters</key>
 				<dict>
 					<key>EndingColumnNumber</key>
-					<string>68</string>
+					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>178</string>
+					<string>177</string>
 					<key>StartingColumnNumber</key>
-					<string>63</string>
+					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>178</string>
+					<string>176</string>
 					<key>Timestamp</key>
-					<string>777656229.110152</string>
+					<string>777827121.04495</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -167,15 +167,16 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>e.sta</string>
+				<string>                            try await locationDisplay.dataSource.start()
+</string>
 				<key>leading</key>
 				<string>                        }
                         do {
-                            try await locationDisplay.dataSourc</string>
+</string>
 				<key>trailing</key>
-				<string>rt()
-                            locationDisplay.initialZoomScale = 1_500
+				<string>                            locationDisplay.initialZoomScale = 1_500
                             locationDisplay.autoPanMode = .recenter
+                        } catch {
 </string>
 			</dict>
 			<key>type</key>

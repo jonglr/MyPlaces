@@ -83,8 +83,6 @@ struct ContentView: View {
     @StateObject private var model = Model()
     @State private var searchText: String = ""
     
-    //@State private var viewExtent: Envelope?
-    
     init() {
         let basemapItemDay = PortalItem(
             portal: .arcGISOnline(connection: .authenticated),
@@ -336,11 +334,8 @@ struct ContentView: View {
             }
         }
         .pickerStyle(.menu)
-        .onReceive(settingsManager.$theme.dropFirst()) { _ in
-            Task {
-                await viewModel.updateRelevance()
-                await viewModel.loadRelevanceScores()
-            }
+        .onChange(of: selectedTheme) {
+            settingsManager.switchTheme(to: selectedTheme.rawValue)
         }
     }
     
@@ -348,6 +343,9 @@ struct ContentView: View {
         VStack {
             Spacer()
             HStack {
+                Text("Theme:")
+                    .foregroundColor(.white)
+                
                 themeSelectionPicker
                     .padding(8)
                     .background(.thinMaterial)
@@ -356,16 +354,9 @@ struct ContentView: View {
             .padding()
         }
         .onAppear {
-            /// Align UI with the persisted theme
-            let persistedTheme = dataManager.fetchTheme() ?? settingsManager.theme
-            if let category = ThemeCategory(rawValue: persistedTheme) {
+            if let category = ThemeCategory(rawValue: settingsManager.theme) {
                 selectedTheme = category
             }
-            /// Ensure global settings reflect the persisted theme to prevent mismatch
-            settingsManager.switchTheme(to: persistedTheme)
-        }
-        .onChange(of: selectedTheme) {
-            settingsManager.switchTheme(to: selectedTheme.rawValue)
         }
     }
     
