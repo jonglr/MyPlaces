@@ -145,13 +145,13 @@
 					<key>EndingColumnNumber</key>
 					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>188</string>
+					<string>189</string>
 					<key>StartingColumnNumber</key>
 					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>187</string>
+					<string>188</string>
 					<key>Timestamp</key>
-					<string>777886863.748351</string>
+					<string>777893788.852568</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -167,16 +167,16 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>                            try await locationDisplay.dataSource.start()
+				<string>                            locationDisplay.initialZoomScale = 1_500
 </string>
 				<key>leading</key>
-				<string>                        }
-                        do {
+				<string>                        do {
+                            try await locationDisplay.dataSource.start()
 </string>
 				<key>trailing</key>
-				<string>                            locationDisplay.initialZoomScale = 1_500
-                            locationDisplay.autoPanMode = .recenter
+				<string>                            locationDisplay.autoPanMode = .recenter
                         } catch {
+                            self.failedToStart = true
 </string>
 			</dict>
 			<key>type</key>
