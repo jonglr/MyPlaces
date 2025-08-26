@@ -24,24 +24,27 @@ private class SearchModel: ObservableObject {
     let locator = LocatorTask(
         url: URL(string: "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer")!
     )
-    
     let textGraphic: Graphic = {
         let textSymbol = TextSymbol(
             text: "",
-            color: .black,
-            size: 14,
+            color: UIColor(red: 6/255.0, green: 6/255.0, blue: 7/255.0, alpha: 0.6),
+            size: 19,
             horizontalAlignment: .center,
             verticalAlignment: .bottom
         )
-        textSymbol.backgroundColor = .white
+        
+        /// Outline around text instead of background block
+        textSymbol.haloColor = .white
+        textSymbol.haloWidth = 1.5
+        
         return Graphic(symbol: textSymbol)
     }()
     
     let markerGraphic: Graphic = {
         let markerSymbol = SimpleMarkerSymbol(
-            style: .square,
-            color: .red,
-            size: 14
+            style: .circle,
+            color: UIColor(red: 78/255.0, green: 143/255.0, blue: 243/255.0, alpha: 1.0),
+            size: 13
         )
         return Graphic(symbol: markerSymbol)
     }()
@@ -150,7 +153,7 @@ struct ContentView: View {
             symbol.text = firstResult.label
             
             /// Recenter map to current user location instead of geocode location
-            await proxy.setViewpointCenter(location, scale: 10000)
+            await proxy.setViewpointCenter(location, scale: 5000)
         }
     }
     
