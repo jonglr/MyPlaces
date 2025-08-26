@@ -129,15 +129,28 @@ def compute_interest_score(
     semantic_p = get_thematic_probability(theme, fclass)
 
     # 2. Distance --------------------------------------------------------
-    MAX_DIST_CH = 360.0  # Swiss diagonal in km
-    dist_norm = min(distance / MAX_DIST_CH, 1.0)
-    distance_p  = math.log(1 + (1.0 - dist_norm)) / math.log(2.0)
+    # Determine base comfortable distance
+    if speed < 7:
+        base_distance = 1.0  # 1 km walking
+    elif speed < 15:
+        base_distance = 3.0  # 3 km biking
+    else:
+        base_distance = 5.0  # 5 km driving
 
-    # Weather amplifies distance effect
-    if weather == 2:        # cloudy
-        distance_p **= 1.2
-    elif weather == 3:      # rainy
-        distance_p **= 1.4
+    # Adjust base distance for weather
+    weather_factors = {
+        1: 1.0,  # Sunny - normal
+        2: 0.8,  # Cloudy - slightly reduced
+        3: 0.6  # Rainy - significantly reduced
+    }
+    base_distance *= weather_factors.get(weather, 1.0)
+
+    # Gaussian decay: e^(-0.5 * (distance / sigma)^2)
+    # sigma controls the spread (we use 0.8 * base_distance for nice behavior)
+    sigma = base_distance
+
+    probability = math.exp(-0.5 * (distance / sigma) ** 2)
+    distance_p = max(0.01, probability)  # Never go below 0.01
 
     # 3. Temporal --------------------------------------------------------
     temporal_p = get_temporal_probability(is_open)
@@ -252,5 +265,5 @@ def generate_dataset(num_samples):
     return df
 
 # Save the main datasets
-df_main = generate_dataset(5000)
+df_main = generate_dataset(10000)
 df_main.to_csv('synthetic_relevance.csv', index=False)

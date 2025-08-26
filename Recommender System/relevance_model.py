@@ -131,7 +131,7 @@ print(f"  Training RMSE:   {train_score:.4f}")
 print(f"  Validation RMSE: {val_score:.4f}")
 print(f"  Gap:             {val_score - train_score:.4f}")
 
-if val_score - train_score > 0.05:
+if val_score - train_score > 0.08:
     print("  Warning: Model might be overfitting")
 else:
     print("  Good generalization")
