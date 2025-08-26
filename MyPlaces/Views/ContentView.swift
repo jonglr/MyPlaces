@@ -17,39 +17,38 @@ import CoreLocation
 
 // MARK: - Graphics for Search
 
-private class Model: ObservableObject {
-
-let graphicsOverlay: GraphicsOverlay
-
-let locator = LocatorTask(
-    url: URL(string: "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer")!
-)
-
-let textGraphic: Graphic = {
-    let textSymbol = TextSymbol(
-        text: "",
-        color: .black,
-        size: 14,
-        horizontalAlignment: .center,
-        verticalAlignment: .bottom
+private class SearchModel: ObservableObject {
+    
+    let graphicsOverlay: GraphicsOverlay
+    
+    let locator = LocatorTask(
+        url: URL(string: "https://utility.arcgis.com/usrsvcs/servers/9a903291d9fd484cb2459f3551b204b4/rest/services/World/GeocodeServer?f=pjson")!
     )
-    textSymbol.backgroundColor = .white
-    return Graphic(symbol: textSymbol)
-}()
-
-let markerGraphic: Graphic = {
-    let markerSymbol = SimpleMarkerSymbol(
-        style: .square,
-        color: .red,
-        size: 14
-    )
-    return Graphic(symbol: markerSymbol)
-}()
-
-init() {
-    graphicsOverlay = GraphicsOverlay(graphics: [textGraphic, markerGraphic])
-}
-
+    
+    let textGraphic: Graphic = {
+        let textSymbol = TextSymbol(
+            text: "",
+            color: .black,
+            size: 14,
+            horizontalAlignment: .center,
+            verticalAlignment: .bottom
+        )
+        textSymbol.backgroundColor = .white
+        return Graphic(symbol: textSymbol)
+    }()
+    
+    let markerGraphic: Graphic = {
+        let markerSymbol = SimpleMarkerSymbol(
+            style: .square,
+            color: .red,
+            size: 14
+        )
+        return Graphic(symbol: markerSymbol)
+    }()
+    
+    init() {
+        graphicsOverlay = GraphicsOverlay(graphics: [textGraphic, markerGraphic])
+    }
 }
 
 
@@ -81,7 +80,7 @@ struct ContentView: View {
     @State private var selectedTheme: ThemeCategory = .explore
     @State private var isThemeInitialized = false
     
-    @StateObject private var model = Model()
+    @StateObject private var model = SearchModel()
     @State private var searchText: String = ""
     
     init() {
