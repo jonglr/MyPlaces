@@ -27,7 +27,7 @@ private class SearchModel: ObservableObject {
     let textGraphic: Graphic = {
         let textSymbol = TextSymbol(
             text: "",
-            color: UIColor(red: 6/255.0, green: 6/255.0, blue: 7/255.0, alpha: 0.6),
+            color: UIColor(red: 6/255.0, green: 6/255.0, blue: 7/255.0, alpha: 0.8),
             size: 19,
             horizontalAlignment: .center,
             verticalAlignment: .bottom
@@ -81,7 +81,6 @@ struct ContentView: View {
     @State private var floatingPanelDetent: FloatingPanelDetent = .half
     
     @State private var selectedTheme: ThemeCategory = .explore
-    @State private var isThemeInitialized = false
     
     @StateObject private var model = SearchModel()
     @State private var searchText: String = ""
@@ -111,16 +110,7 @@ struct ContentView: View {
         initialMap.addOperationalLayer(irrelevantPOIs)
         
         self._map = State(initialValue: initialMap)
-        
-        /// Get the saved theme from DataManager
-        let savedTheme = DataManager.shared.fetchTheme() ?? "explore"
-        
-        // Convert string to ThemeCategory enum
-        if let category = ThemeCategory(rawValue: savedTheme) {
-            self._selectedTheme = State(initialValue: category)
-        } else {
-            self._selectedTheme = State(initialValue: .explore)
-        }
+
     }
     
     /// Possible themes for the theme picker element
@@ -165,6 +155,10 @@ struct ContentView: View {
             toggleOverlay
             themePicker
         }
+        .loadingOverlay(
+                    isPresented: $viewModel.isComputingRelevance,
+                    text: "Calculating relevance scores…"
+        )
     }
     
     private var mapLayer: some View {
@@ -176,12 +170,12 @@ struct ContentView: View {
                 )
                     .locationDisplay(locationDisplay)
                 
-                /// Single tap gesture to identify layers
+                    /// Single tap gesture to identify layers
                     .onSingleTapGesture { screenPoint, _ in
                         identifyScreenPoint = screenPoint
                     }
                 
-                /// Start location display
+                    /// Start location display
                     .task {
                         let locationManager = CLLocationManager()
                         if locationManager.authorizationStatus == .notDetermined {
@@ -195,7 +189,7 @@ struct ContentView: View {
                             self.failedToStart = true
                         }
                     }
-                /// Identify the tapped feature
+                    /// Identify the tapped feature
                     .task(id: identifyScreenPoint) {
                         guard let identifyScreenPoint,
                               let identifyResult = try? await proxy.identifyLayers(
@@ -215,7 +209,7 @@ struct ContentView: View {
                             }
                         }
                     }
-                /// Floating panel for pop-ups
+                    /// Floating panel for pop-ups
                     .floatingPanel(
                         selectedDetent: $floatingPanelDetent,
                         horizontalAlignment: .leading,
@@ -225,9 +219,10 @@ struct ContentView: View {
                             .showCloseButton(true)
                             .padding()
                     }
-                /// In case location fails
+                    /// In case location fails
                     .alert("Location display failed to start", isPresented: $failedToStart) {}
-                
+                    
+                    /// Switch Day/Nightmode
                     .onChange(of: settingsManager.isNightMode) {
                         print("Switching to \(settingsManager.isNightMode ? "night" : "day") mode")
                         
@@ -290,6 +285,7 @@ struct ContentView: View {
                             await viewModel.loadRelevanceScores()
                         }
                     }
+                
                 VStack {
                     HStack {
                         TextField("Enter address", text: $searchText)
@@ -349,10 +345,7 @@ struct ContentView: View {
         }
         .pickerStyle(.menu)
         .onChange(of: selectedTheme) {
-            /// Only save if initialized and actually different
-            if isThemeInitialized && selectedTheme.rawValue != settingsManager.theme {
-                settingsManager.switchTheme(to: selectedTheme.rawValue)
-            }
+            settingsManager.switchTheme(to: selectedTheme.rawValue)
         }
     }
     
@@ -376,7 +369,6 @@ struct ContentView: View {
                let category = ThemeCategory(rawValue: currentTheme) {
                 selectedTheme = category
             }
-            isThemeInitialized = true
         }
     }
     

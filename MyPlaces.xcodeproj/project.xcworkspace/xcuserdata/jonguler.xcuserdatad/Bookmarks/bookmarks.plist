@@ -56,13 +56,13 @@
 					<key>EndingColumnNumber</key>
 					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>106</string>
+					<string>108</string>
 					<key>StartingColumnNumber</key>
 					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>105</string>
+					<string>107</string>
 					<key>Timestamp</key>
-					<string>777637505.640739</string>
+					<string>777901338.951254</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -99,15 +99,15 @@
 				<key>location-parameters</key>
 				<dict>
 					<key>EndingColumnNumber</key>
-					<string>89</string>
+					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>143</string>
+					<string>146</string>
 					<key>StartingColumnNumber</key>
-					<string>80</string>
+					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>143</string>
+					<string>145</string>
 					<key>Timestamp</key>
-					<string>777656201.689128</string>
+					<string>777901338.9512399</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -123,15 +123,16 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>threshold</string>
+				<string>        let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, threshold: 25)
+</string>
 				<key>leading</key>
 				<string>        
         /// Apply aggregation to remove overlapping POIs with the threshold of X meters
-        let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, </string>
+</string>
 				<key>trailing</key>
-				<string>: 25)
-        print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
+				<string>        print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
         
+        /// Update displayed POIs
 </string>
 			</dict>
 			<key>type</key>
@@ -145,13 +146,13 @@
 					<key>EndingColumnNumber</key>
 					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>192</string>
+					<string>186</string>
 					<key>StartingColumnNumber</key>
 					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>191</string>
+					<string>185</string>
 					<key>Timestamp</key>
-					<string>777899212.874671</string>
+					<string>777902048.5276411</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>

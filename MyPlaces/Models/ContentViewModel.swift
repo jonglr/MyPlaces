@@ -21,6 +21,8 @@ class ContentViewModel: ObservableObject {
     private var allPOIs: [ArcGISFeature] = []
     /// The visualization of the relevant POIs that get overlayed onto the rest of the POIs
     @Published var displayedPOIs: [ArcGISFeature] = []
+    /// Exposed flag to display the loading sign in the view model
+    @Published var isComputingRelevance = false
     
     /// Core Data Managers
     private let context = PersistenceController.shared.container.viewContext
@@ -190,6 +192,11 @@ class ContentViewModel: ObservableObject {
     
     /// Relevance Score Calculation by the ML Model
     func updateRelevance() async {
+        
+        /// Handling the loading overlay
+        isComputingRelevance = true
+        defer { isComputingRelevance = false }
+        
         print("Predicting relevance scores...")
         for poi in allPOIs {
                 /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
