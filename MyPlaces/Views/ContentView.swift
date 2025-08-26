@@ -22,7 +22,7 @@ private class SearchModel: ObservableObject {
     let graphicsOverlay: GraphicsOverlay
     
     let locator = LocatorTask(
-        url: URL(string: "https://utility.arcgis.com/usrsvcs/servers/9a903291d9fd484cb2459f3551b204b4/rest/services/World/GeocodeServer?f=pjson")!
+        url: URL(string: "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer")!
     )
     
     let textGraphic: Graphic = {
@@ -149,10 +149,8 @@ struct ContentView: View {
             model.textGraphic.geometry = location
             symbol.text = firstResult.label
             
-            // Recenter map to current user location instead of geocode location
-            if let userLocation = locationDisplay.mapLocation {
-                await proxy.setViewpointCenter(userLocation, scale: 10000)
-            }
+            /// Recenter map to current user location instead of geocode location
+            await proxy.setViewpointCenter(location, scale: 10000)
         }
     }
     
@@ -169,7 +167,10 @@ struct ContentView: View {
     private var mapLayer: some View {
         MapViewReader { proxy in
             ZStack(alignment: .topTrailing) {
-                MapView(map: map)
+                MapView(
+                    map: map,
+                    graphicsOverlays: [model.graphicsOverlay]
+                )
                     .locationDisplay(locationDisplay)
                 
                 /// Single tap gesture to identify layers
