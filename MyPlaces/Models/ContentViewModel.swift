@@ -166,7 +166,7 @@ class ContentViewModel: ObservableObject {
     }
     
     /// Helper function to get relevance score for a POI
-    private func getRelevanceScore(for poi: ArcGISFeature) -> Double {
+    func getRelevanceScore(for poi: ArcGISFeature) -> Double {
         guard let user = dataManager.currentUser(),
               let fidAny = poi.attributes["fid"],
               let fid = (fidAny as? NSNumber)?.int64Value else { return 0.0 }
@@ -190,6 +190,7 @@ class ContentViewModel: ObservableObject {
     
     /// Relevance Score Calculation by the ML Model
     func updateRelevance() async {
+        print("Predicting relevance scores...")
         for poi in allPOIs {
                 /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
                 guard let fclassRaw = poi.attributes["fclass"] as? String,
@@ -226,7 +227,6 @@ class ContentViewModel: ObservableObject {
                     await MainActor.run {
                         dataManager.saveRelevanceScore(for: poiID, score: score)
                     }
-                    print("Predicted relevance score for \(poiID): \(score)")
                 } else {
                     print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
                 }

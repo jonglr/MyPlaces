@@ -79,6 +79,7 @@ struct ContentView: View {
     @State private var floatingPanelDetent: FloatingPanelDetent = .half
     
     @State private var selectedTheme: ThemeCategory = .explore
+    @State private var isThemeInitialized = false
     
     @StateObject private var model = Model()
     @State private var searchText: String = ""
@@ -108,6 +109,16 @@ struct ContentView: View {
         initialMap.addOperationalLayer(irrelevantPOIs)
         
         self._map = State(initialValue: initialMap)
+        
+        /// Get the saved theme from DataManager
+        let savedTheme = DataManager.shared.fetchTheme() ?? "explore"
+        
+        // Convert string to ThemeCategory enum
+        if let category = ThemeCategory(rawValue: savedTheme) {
+            self._selectedTheme = State(initialValue: category)
+        } else {
+            self._selectedTheme = State(initialValue: .explore)
+        }
     }
     
     /// Possible themes for the theme picker element
@@ -197,7 +208,7 @@ struct ContentView: View {
                             if let feature = resultPopup.geoElement as? ArcGISFeature {
                                 viewModel.recordPOIClick(poi: feature)
                                 print("Feature clicked: \(feature.attributes["osm_id"] as! String)")
-                                print("Relevance Score of POI Feature: ", feature.attributes["relevanceScore"] ?? -1)
+                                print("Relevance Score of POI Feature: ", viewModel.getRelevanceScore(for: feature))
                             }
                         }
                     }
@@ -335,7 +346,10 @@ struct ContentView: View {
         }
         .pickerStyle(.menu)
         .onChange(of: selectedTheme) {
-            settingsManager.switchTheme(to: selectedTheme.rawValue)
+            /// Only save if initialized and actually different
+            if isThemeInitialized && selectedTheme.rawValue != settingsManager.theme {
+                settingsManager.switchTheme(to: selectedTheme.rawValue)
+            }
         }
     }
     
@@ -354,9 +368,12 @@ struct ContentView: View {
             .padding()
         }
         .onAppear {
-            if let category = ThemeCategory(rawValue: settingsManager.theme) {
+            /// Sync with the latest theme from settingsManager
+            if let currentTheme = dataManager.fetchTheme(),
+               let category = ThemeCategory(rawValue: currentTheme) {
                 selectedTheme = category
             }
+            isThemeInitialized = true
         }
     }
     
