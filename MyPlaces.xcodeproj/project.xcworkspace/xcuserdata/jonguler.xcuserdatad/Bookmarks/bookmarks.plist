@@ -10,140 +10,6 @@
 				<key>location-parameters</key>
 				<dict>
 					<key>EndingColumnNumber</key>
-					<string>8</string>
-					<key>EndingLineNumber</key>
-					<string>54</string>
-					<key>StartingColumnNumber</key>
-					<string>0</string>
-					<key>StartingLineNumber</key>
-					<string>54</string>
-					<key>Timestamp</key>
-					<string>775929925.441455</string>
-				</dict>
-				<key>rebasable-url</key>
-				<dict>
-					<key>base</key>
-					<string>workspace</string>
-					<key>payload</key>
-					<dict>
-						<key>relative-path</key>
-						<string>MyPlaces/Models/POIModel.swift</string>
-					</dict>
-				</dict>
-			</dict>
-			<key>text-context</key>
-			<dict>
-				<key>focused</key>
-				<string>        </string>
-				<key>leading</key>
-				<string>        
-        /// Create a bounding box around the user location
-</string>
-				<key>trailing</key>
-				<string>let buffer: Double = 0.00225 // ~250m buffer in degrees
-        let envelope = Envelope(
-            xMin: userPoint.x - buffer,
-</string>
-			</dict>
-			<key>type</key>
-			<string>bookmark</string>
-		</dict>
-		<dict>
-			<key>destination</key>
-			<dict>
-				<key>location-parameters</key>
-				<dict>
-					<key>EndingColumnNumber</key>
-					<string>0</string>
-					<key>EndingLineNumber</key>
-					<string>108</string>
-					<key>StartingColumnNumber</key>
-					<string>0</string>
-					<key>StartingLineNumber</key>
-					<string>107</string>
-					<key>Timestamp</key>
-					<string>777901338.951254</string>
-				</dict>
-				<key>rebasable-url</key>
-				<dict>
-					<key>base</key>
-					<string>workspace</string>
-					<key>payload</key>
-					<dict>
-						<key>relative-path</key>
-						<string>MyPlaces/Models/ContentViewModel.swift</string>
-					</dict>
-				</dict>
-			</dict>
-			<key>text-context</key>
-			<dict>
-				<key>focused</key>
-				<string>            guard score &gt; 0.5 else { return nil }
-</string>
-				<key>leading</key>
-				<string>        let relevantPOIs = allPOIs.compactMap { poi -&gt; (poi: ArcGISFeature, score: Double, fclass: Double)? in
-            let score = getRelevanceScore(for: poi)
-</string>
-				<key>trailing</key>
-				<string>            
-            /// Get fclass for thematic filtering
-            guard let fclassRaw = poi.attributes["fclass"] as? String,
-</string>
-			</dict>
-			<key>type</key>
-			<string>bookmark</string>
-		</dict>
-		<dict>
-			<key>destination</key>
-			<dict>
-				<key>location-parameters</key>
-				<dict>
-					<key>EndingColumnNumber</key>
-					<string>0</string>
-					<key>EndingLineNumber</key>
-					<string>146</string>
-					<key>StartingColumnNumber</key>
-					<string>0</string>
-					<key>StartingLineNumber</key>
-					<string>145</string>
-					<key>Timestamp</key>
-					<string>777901338.9512399</string>
-				</dict>
-				<key>rebasable-url</key>
-				<dict>
-					<key>base</key>
-					<string>workspace</string>
-					<key>payload</key>
-					<dict>
-						<key>relative-path</key>
-						<string>MyPlaces/Models/ContentViewModel.swift</string>
-					</dict>
-				</dict>
-			</dict>
-			<key>text-context</key>
-			<dict>
-				<key>focused</key>
-				<string>        let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, threshold: 25)
-</string>
-				<key>leading</key>
-				<string>        
-        /// Apply aggregation to remove overlapping POIs with the threshold of X meters
-</string>
-				<key>trailing</key>
-				<string>        print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
-        
-        /// Update displayed POIs
-</string>
-			</dict>
-			<key>type</key>
-			<string>bookmark</string>
-		</dict>
-		<dict>
-			<key>destination</key>
-			<dict>
-				<key>location-parameters</key>
-				<dict>
-					<key>EndingColumnNumber</key>
 					<string>0</string>
 					<key>EndingLineNumber</key>
 					<string>186</string>
@@ -152,7 +18,7 @@
 					<key>StartingLineNumber</key>
 					<string>185</string>
 					<key>Timestamp</key>
-					<string>777902048.5276411</string>
+					<string>777973741.460855</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>

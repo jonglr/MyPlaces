@@ -82,75 +82,79 @@ class ContentViewModel: ObservableObject {
     @MainActor
     private func initializePOIModel() async {
         let model = await POIModel(variableManager: variableManager) // Initialize asynchronously
-        self.poiModel = model
-        self.allPOIs = model.POIs
+        await MainActor.run {
+            self.poiModel = model
+            self.allPOIs = model.POIs
+        }
     }
     
     /// Load Relevance Scores and Filter POIs
     @MainActor
     func loadRelevanceScores() async {
-        guard dataManager.currentUser() != nil else {
-            print("No user logged in.")
-            return
-        }
-        guard let allPOIs = poiModel?.POIs else {
-            print("POI model not initialized")
-            return
-        }
-        
-        /// Get current user theme
-        let currentTheme = variableManager.currentUserTheme()
-        let themeClasses = getFclassesForTheme(currentTheme)
-        
-        /// Filter POIs that have relevance scores > 0.5
-        let relevantPOIs = allPOIs.compactMap { poi -> (poi: ArcGISFeature, score: Double, fclass: Double)? in
-            let score = getRelevanceScore(for: poi)
-            guard score > 0.5 else { return nil }
-            
-            /// Get fclass for thematic filtering
-            guard let fclassRaw = poi.attributes["fclass"] as? String,
-                  let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
-                return nil
+        await MainActor.run {
+            guard dataManager.currentUser() != nil else {
+                print("No user logged in.")
+                return
+            }
+            guard let allPOIs = poiModel?.POIs else {
+                print("POI model not initialized")
+                return
             }
             
-            return (poi: poi, score: score, fclass: fclass)
+            /// Get current user theme
+            let currentTheme = variableManager.currentUserTheme()
+            let themeClasses = getFclassesForTheme(currentTheme)
+            
+            /// Filter POIs that have relevance scores > 0.5
+            let relevantPOIs = allPOIs.compactMap { poi -> (poi: ArcGISFeature, score: Double, fclass: Double)? in
+                let score = getRelevanceScore(for: poi)
+                guard score > 0.5 else { return nil }
+                
+                /// Get fclass for thematic filtering
+                guard let fclassRaw = poi.attributes["fclass"] as? String,
+                      let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
+                    return nil
+                }
+                
+                return (poi: poi, score: score, fclass: fclass)
+            }
+            print("Filtered POIs before thematic filtering: \(relevantPOIs.count)")
+            
+            /// Separate POIs into themed (match user map theme) and non-themed groups
+            let themedPOIs = relevantPOIs.filter { themeClasses.isEmpty || themeClasses.contains($0.fclass) }
+            let nonThemedPOIs = relevantPOIs.filter { !themeClasses.isEmpty && !themeClasses.contains($0.fclass) }
+            
+            /// Sort both groups by relevance score (highest first)
+            let sortedThemedPOIs = themedPOIs.sorted { $0.score > $1.score }
+            let sortedNonThemedPOIs = nonThemedPOIs.sorted { $0.score > $1.score }
+            
+            /// Calculate balanced counts - use themed POI count as the limit
+            let availableThemedCount = sortedThemedPOIs.count
+            let availableDiscoveryCount = sortedNonThemedPOIs.count
+            
+            /// Take all available themed POIs
+            let selectedThemedPOIs = sortedThemedPOIs
+            
+            /// Take same number of discovery POIs as themed POIs (or all if fewer available)
+            let discoveryTargetCount = min(availableThemedCount, availableDiscoveryCount)
+            let selectedDiscoveryPOIs = Array(sortedNonThemedPOIs.prefix(discoveryTargetCount))
+            
+            /// Combine all selected POIs
+            let combinedPOIs = (selectedThemedPOIs + selectedDiscoveryPOIs).map { $0.poi }
+            
+            print("Themed POIs: \(selectedThemedPOIs.count), Discovery POIs: \(selectedDiscoveryPOIs.count)")
+            print("Total POIs before aggregation: \(combinedPOIs.count)")
+            
+            /// Apply aggregation to remove overlapping POIs with the threshold of X meters
+            let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, threshold: 25)
+            print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
+            
+            /// Update displayed POIs
+            self.displayedPOIs = filteredGeneralizedPOIs
+            
+            print("All POIs: \(allPOIs.count) Loaded Relevant POIs: \(displayedPOIs.count)")
+            print("Current theme: \(currentTheme) (\(getThemeName(currentTheme)))")
         }
-        print("Filtered POIs before thematic filtering: \(relevantPOIs.count)")
-        
-        /// Separate POIs into themed (match user map theme) and non-themed groups
-        let themedPOIs = relevantPOIs.filter { themeClasses.isEmpty || themeClasses.contains($0.fclass) }
-        let nonThemedPOIs = relevantPOIs.filter { !themeClasses.isEmpty && !themeClasses.contains($0.fclass) }
-        
-        /// Sort both groups by relevance score (highest first)
-        let sortedThemedPOIs = themedPOIs.sorted { $0.score > $1.score }
-        let sortedNonThemedPOIs = nonThemedPOIs.sorted { $0.score > $1.score }
-        
-        /// Calculate balanced counts - use themed POI count as the limit
-        let availableThemedCount = sortedThemedPOIs.count
-        let availableDiscoveryCount = sortedNonThemedPOIs.count
-        
-        /// Take all available themed POIs
-        let selectedThemedPOIs = sortedThemedPOIs
-        
-        /// Take same number of discovery POIs as themed POIs (or all if fewer available)
-        let discoveryTargetCount = min(availableThemedCount, availableDiscoveryCount)
-        let selectedDiscoveryPOIs = Array(sortedNonThemedPOIs.prefix(discoveryTargetCount))
-        
-        /// Combine all selected POIs
-        let combinedPOIs = (selectedThemedPOIs + selectedDiscoveryPOIs).map { $0.poi }
-        
-        print("Themed POIs: \(selectedThemedPOIs.count), Discovery POIs: \(selectedDiscoveryPOIs.count)")
-        print("Total POIs before aggregation: \(combinedPOIs.count)")
-        
-        /// Apply aggregation to remove overlapping POIs with the threshold of X meters
-        let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, threshold: 25)
-        print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
-        
-        /// Update displayed POIs
-        self.displayedPOIs = filteredGeneralizedPOIs
-        
-        print("All POIs: \(allPOIs.count) Loaded Relevant POIs: \(displayedPOIs.count)")
-        print("Current theme: \(currentTheme) (\(getThemeName(currentTheme)))")
     }
     
     /// Helper function to get theme name for logging
@@ -194,8 +198,14 @@ class ContentViewModel: ObservableObject {
     func updateRelevance() async {
         
         /// Handling the loading overlay
-        isComputingRelevance = true
-        defer { isComputingRelevance = false }
+        await MainActor.run {
+            isComputingRelevance = true
+        }
+        defer {
+            Task { @MainActor in
+                isComputingRelevance = false
+            }
+        }
         
         print("Predicting relevance scores...")
         for poi in allPOIs {
@@ -244,7 +254,9 @@ class ContentViewModel: ObservableObject {
     /// Map theme choice by the ML Model
     func updateTheme() async {
         let thematicChoice = await thematicModelManager.predictTheme(timeOfDay: variableManager.currentTimeOfDay(), dayOfWeek: variableManager.currentDay(), environmentType: variableManager.currentEnvironment())
-        dataManager.saveTheme(theme: thematicChoice)
+        await MainActor.run {
+            dataManager.saveTheme(theme: thematicChoice)
+        }
     }
     
     
