@@ -52,7 +52,7 @@ class POIModel {
         }
         
         /// Create a bounding box around the user location
-        let buffer: Double = 0.00225 // ~250m buffer in degrees
+        let buffer: Double = 0.0225 // ~2.5km buffer in degrees
         let envelope = Envelope(
             xMin: userPoint.x - buffer,
             yMin: userPoint.y - buffer,
@@ -66,7 +66,7 @@ class POIModel {
             let query = QueryParameters()
             query.geometry = envelope
             query.spatialRelationship = .intersects
-            query.whereClause = "1=1"
+            query.whereClause = "name IS NOT NULL AND name <> ''" // filter out the POIs without a name
             
             /// Directly converting the sequence of features into an array
             guard let featureTable = self.featureTable else { return }

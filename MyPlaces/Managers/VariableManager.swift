@@ -20,6 +20,90 @@ class VariableManager {
     private let dataManager = DataManager.shared
     private let context = PersistenceController.shared.container.viewContext
     
+    // MARK: - Cache Properties
+        
+    private struct CachedData {
+        let weather: Double
+        let environment: Double
+        let userLocation: Point
+        let timestamp: Date
+        
+        var isValid: Bool {
+            // Cache is valid for 1 hour (3600 seconds)
+            return Date().timeIntervalSince(timestamp) < 3600
+        }
+    }
+        
+    private var cachedData: CachedData?
+        
+    // MARK: - Cache Management
+        
+    /// Refreshes cached data (weather, environment, user location) for relevance calculations
+    /// Should be called once per relevance score update cycle
+    func refreshCachedData() async -> Bool {
+        // Check if cache is still valid
+        if let cached = cachedData, cached.isValid {
+            print("Using cached data (valid for \(Int(3600 - Date().timeIntervalSince(cached.timestamp))) more seconds)")
+            return true
+        }
+        
+        // Get current user location
+        guard let userLocation = getCurrentLocationPoint() else {
+            print("Failed to get user location for cache refresh")
+            return false
+        }
+        
+        print("Refreshing cached data...")
+        
+        // Fetch weather and environment data concurrently
+        async let weatherTask = currentWeather(for: userLocation)
+        async let environmentTask = currentEnvironment(for: userLocation)
+        
+        let weather = await weatherTask
+        let environment = await environmentTask
+        
+        // Cache the new data
+        cachedData = CachedData(
+            weather: weather,
+            environment: environment,
+            userLocation: userLocation,
+            timestamp: Date()
+        )
+        
+        print("Cache refreshed - Weather: \(weather), Environment: \(environment)")
+        return true
+    }
+        
+    /// Returns cached weather data, refreshes cache if needed
+    func getCachedWeather() async -> Double {
+        if await refreshCachedData() {
+            return cachedData?.weather ?? 2.0
+        }
+        return 2.0 // Default: cloudy
+    }
+        
+    /// Returns cached environment data, refreshes cache if needed
+    func getCachedEnvironment() async -> Double {
+        if await refreshCachedData() {
+            return cachedData?.environment ?? 1.0
+        }
+        return 1.0 // Default: rural
+    }
+        
+    /// Returns cached user location, refreshes cache if needed
+    func getCachedUserLocation() async -> Point? {
+        if await refreshCachedData() {
+            return cachedData?.userLocation
+        }
+        return nil
+    }
+        
+    /// Forces cache invalidation (useful for testing or manual refresh)
+    func invalidateCache() {
+        cachedData = nil
+        print("Cache invalidated")
+    }
+    
     // MARK: - Convertors
     
     /// converts the fclasses into corresponding doubles for the model input
@@ -94,11 +178,22 @@ class VariableManager {
     
     /// Fetches the context score (0 = urban, 1 = rural, 2 = nature) at the given location.
     func currentEnvironment() async -> Double {
-        /// Defaults to 1.0 (rural) if no match found or an error occurs.
+        // Use cached version if available
+        if let cached = cachedData, cached.isValid {
+            return cached.environment
+        }
+        
+        // Get current location and fetch environment
         guard let point = getCurrentLocationPoint() else {
             print("No valid user location.")
             return 1.0
         }
+        
+        return await currentEnvironment(for: point)
+    }
+        
+    /// Fetches environment data for a specific location (used internally by caching system)
+    private func currentEnvironment(for point: Point) async -> Double {
         do {
             let serviceItem = PortalItem(
                 portal: .arcGISOnline(connection: .authenticated),
@@ -121,28 +216,41 @@ class VariableManager {
         }
         return 1.0
     }
-    
+        
     /// Uses the current weather data and converts them in an output for 1: Sunny, 2: Cloudy, 3: Rainy
     func currentWeather() async -> Double {
-        guard let point = getCurrentLocationPoint() else { return 2.0 }
-
-            let urlStr = "https://api.open-meteo.com/v1/forecast?latitude=\(point.y)&longitude=\(point.x)&current=weather_code"
-            guard let url = URL(string: urlStr) else { return 2.0 }
-
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let current = json["current"] as? [String: Any],
-                   let code = current["weather_code"] as? Int {
-                    return mapWeatherCodeToScore(code)
-                }
-            } catch {
-                print("Weather fetch error:", error.localizedDescription)
-            }
-
-            return 2.0 /// Default: cloudy
+        // Use cached version if available
+        if let cached = cachedData, cached.isValid {
+            return cached.weather
+        }
+        
+        // Get current location and fetch weather
+        guard let point = getCurrentLocationPoint() else {
+            return 2.0
+        }
+        
+        return await currentWeather(for: point)
     }
-    
+        
+    /// Fetches weather data for a specific location (used internally by caching system)
+    private func currentWeather(for point: Point) async -> Double {
+        let urlStr = "https://api.open-meteo.com/v1/forecast?latitude=\(point.y)&longitude=\(point.x)&current=weather_code"
+        guard let url = URL(string: urlStr) else { return 2.0 }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let current = json["current"] as? [String: Any],
+               let code = current["weather_code"] as? Int {
+                return mapWeatherCodeToScore(code)
+            }
+        } catch {
+            print("Weather fetch error:", error.localizedDescription)
+        }
+        
+        return 2.0 // Default cloudy
+    }
+        
     /// Maps evironment type strings to doubles
     private func envTypeToDouble(from desc: String) -> Double {
         switch desc {
@@ -152,12 +260,12 @@ class VariableManager {
         default: return 1.0 /// Default to rural if unknown type
         }
     }
-    
+        
     /// Returns the current location at call in form of a WGS84 Point geometry type
     func getCurrentLocationPoint() -> Point? {
         let locationManager = CLLocationManager()
         locationManager.requestWhenInUseAuthorization()
-
+        
         guard let userLocation = locationManager.location else {
             print("User location not available")
             return nil
@@ -169,7 +277,7 @@ class VariableManager {
         )
         return userPoint
     }
-    
+        
     /// Maps the weather code to a double
     func mapWeatherCodeToScore(_ code: Int) -> Double {
         switch code {
@@ -282,9 +390,16 @@ class VariableManager {
     }
     
     /// Calculates the distance between the current location of the user and the POI Feature
-    func calculateDistanceToUser(origin poi: ArcGISFeature) -> Double {
-        /// retrieve the location of the user
-        guard let point = getCurrentLocationPoint() else { return 360.0 }
+    func calculateDistanceToUser(origin poi: ArcGISFeature) async -> Double {
+        /// Use cached location if available, otherwise get current location
+        let userLocation: Point?
+        if let cached = cachedData, cached.isValid {
+            userLocation = cached.userLocation
+        } else {
+            userLocation = getCurrentLocationPoint()
+        }
+        
+        guard let point = userLocation else { return 360.0 }
         /// Get the POI Geometry and convert into a Point Feature, else return the max kilometer distance of the model training dataset
         guard let poiPoint = poi.geometry as? Point else { return 360.0 }
         /// Reproject both to WGS84 to ensure compatibility
@@ -295,7 +410,7 @@ class VariableManager {
             print("Projection failed")
             return 360.0
         }
-
+        
         let distanceMeters = GeometryEngine.distance(from: userPoint, to: featurePoint)
         guard !distanceMeters.isNaN else {
             print("distance is Nan")

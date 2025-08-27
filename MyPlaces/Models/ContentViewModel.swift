@@ -206,8 +206,20 @@ class ContentViewModel: ObservableObject {
                 isComputingRelevance = false
             }
         }
-        
         print("Predicting relevance scores...")
+        
+        /// Refresh cached data once at the beginning of relevance calculation cycle
+        let cacheRefreshSuccess = await variableManager.refreshCachedData()
+        if !cacheRefreshSuccess {
+            print("Failed to refresh cached data, using fallback values")
+        }
+        
+        /// Get cached values that will be used for all POIs
+        let cachedWeather = await variableManager.getCachedWeather()
+        let cachedEnvironment = await variableManager.getCachedEnvironment()
+        let currentSpeed = variableManager.currentSpeed()
+        let currentTheme = variableManager.currentUserTheme()
+        
         for poi in allPOIs {
                 /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
                 guard let fclassRaw = poi.attributes["fclass"] as? String,
@@ -223,19 +235,19 @@ class ContentViewModel: ObservableObject {
                     /// get the attributes for the score computation ot the poi
                     let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
                     let (open, hasOpeningHours) = variableManager.isOpen(otherTags: poi.attributes["other_tags"] as! String)
-                    let distance = variableManager.calculateDistanceToUser(origin: poi)
+                    let distance = await variableManager.calculateDistanceToUser(origin: poi)
                     let hasName = variableManager.hasName(poi: poi)
-                    
-                    /// compute the relevance Score
-                    let score = await relevanceModelManager.predictRelevance(
+                                        
+                    /// compute the relevance Score using cached values
+                    let score = relevanceModelManager.predictRelevance(
                         distance: distance,
-                        speed: variableManager.currentSpeed(),
-                        weather: variableManager.currentWeather(),
+                        speed: currentSpeed,
+                        weather: cachedWeather,
                         isOpen: open,
                         favorite: isFavorite,
                         clickCount: clickCount,
                         lastClickedDate: daysAgo,
-                        theme: variableManager.currentUserTheme(),
+                        theme: currentTheme,
                         fclass: fclass,
                         hasName: hasName,
                         hasOpeningHours: hasOpeningHours
@@ -253,7 +265,12 @@ class ContentViewModel: ObservableObject {
     
     /// Map theme choice by the ML Model
     func updateTheme() async {
-        let thematicChoice = await thematicModelManager.predictTheme(timeOfDay: variableManager.currentTimeOfDay(), dayOfWeek: variableManager.currentDay(), environmentType: variableManager.currentEnvironment())
+        let cachedEnvironment = await variableManager.getCachedEnvironment()
+        let thematicChoice = thematicModelManager.predictTheme(
+            timeOfDay: variableManager.currentTimeOfDay(),
+            dayOfWeek: variableManager.currentDay(),
+            environmentType: cachedEnvironment
+        )
         await MainActor.run {
             dataManager.saveTheme(theme: thematicChoice)
         }
@@ -275,6 +292,23 @@ class ContentViewModel: ObservableObject {
            let fid = (fidAny as? NSNumber)?.int64Value {
             let poiID = variableManager.uuidFromFID(fid)
             dataManager.updatePOIInteraction(poiID: poiID, context: context)
+        }
+    }
+    
+    // MARK: - Cache Management
+        
+    /// Manually refresh cached data (useful for testing or when user changes location significantly)
+    func refreshCache() async {
+        print("Manually refreshing cache...")
+        variableManager.invalidateCache()
+        let success = await variableManager.refreshCachedData()
+        if success {
+            print("Cache refreshed successfully")
+            // Optionally recalculate relevance scores with new data
+            await updateRelevance()
+            await loadRelevanceScores()
+        } else {
+            print("Failed to refresh cache")
         }
     }
     
