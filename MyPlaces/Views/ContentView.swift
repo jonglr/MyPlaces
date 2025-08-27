@@ -28,14 +28,14 @@ private class SearchModel: ObservableObject {
         let textSymbol = TextSymbol(
             text: "",
             color: UIColor(red: 6/255.0, green: 6/255.0, blue: 7/255.0, alpha: 0.8),
-            size: 19,
+            size: 25,
             horizontalAlignment: .center,
             verticalAlignment: .bottom
         )
         
         /// Outline around text instead of background block
         textSymbol.haloColor = .white
-        textSymbol.haloWidth = 1.5
+        textSymbol.haloWidth = 1
         
         return Graphic(symbol: textSymbol)
     }()

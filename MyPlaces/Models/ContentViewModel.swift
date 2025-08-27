@@ -216,7 +216,6 @@ class ContentViewModel: ObservableObject {
         
         /// Get cached values that will be used for all POIs
         let cachedWeather = await variableManager.getCachedWeather()
-        let cachedEnvironment = await variableManager.getCachedEnvironment()
         let currentSpeed = variableManager.currentSpeed()
         let currentTheme = variableManager.currentUserTheme()
         

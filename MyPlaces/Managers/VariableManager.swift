@@ -43,7 +43,6 @@ class VariableManager {
     func refreshCachedData() async -> Bool {
         // Check if cache is still valid
         if let cached = cachedData, cached.isValid {
-            print("Using cached data (valid for \(Int(3600 - Date().timeIntervalSince(cached.timestamp))) more seconds)")
             return true
         }
         
