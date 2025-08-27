@@ -17,25 +17,32 @@ import CoreData
 struct MyPlacesApp: App {
     
     let persistenceController = PersistenceController.shared
-    @StateObject private var settingsManager = SettingsManager(context: PersistenceController.shared.container.viewContext)
-    @StateObject private var dataManager = DataManager(context: PersistenceController.shared.container.viewContext)
+    @StateObject private var dataManager: DataManager
+    @StateObject private var settingsManager: SettingsManager
     
     init(){
         ArcGISEnvironment.apiKey = APIKey(Keys.apiKey)
+        
+        // Initialize DataManager first
+        let dataManager = DataManager(context: PersistenceController.shared.container.viewContext)
+        self._dataManager = StateObject(wrappedValue: dataManager)
+        
+        // Then SettingsManager with proper context
+        let settingsManager = SettingsManager(context: PersistenceController.shared.container.viewContext)
+        self._settingsManager = StateObject(wrappedValue: settingsManager)
     }
     
     var body: some SwiftUI.Scene {
         WindowGroup {
-            /// if there is no user profile stored yet, the Onboarding view will be shown to the user
             if dataManager.hasUser {
-                    ContentView()
-                        .environmentObject(dataManager)
-                        .environmentObject(settingsManager)
-                        .environment(\.managedObjectContext, persistenceController.container.viewContext)
-                } else {
-                    OnboardingView()
-                        .environmentObject(dataManager)
-                }
+                ContentView()
+                    .environmentObject(dataManager)
+                    .environmentObject(settingsManager)
+                    .environment(\.managedObjectContext, persistenceController.container.viewContext)
+            } else {
+                OnboardingView()
+                    .environmentObject(dataManager)
+            }
         }
     }
 }

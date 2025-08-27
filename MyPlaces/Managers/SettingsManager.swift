@@ -16,15 +16,7 @@ import SwiftUI
 class SettingsManager: ObservableObject {
     @Published var isNightMode: Bool = false
     @Published var user: UserProfile
-    
-    @Published var theme: String {
-        didSet {
-            DataManager.shared.saveTheme(theme: theme)
-            user.theme = theme
-            try? context.save()
-            
-        }
-    }
+    @Published var theme: String = "explore"
     
     static let shared = DataManager(context: PersistenceController.shared.container.viewContext)
     private let context: NSManagedObjectContext
@@ -33,11 +25,32 @@ class SettingsManager: ObservableObject {
         self.context = context
         let user = DataManager.shared.currentUser()!
         self.user = user
-        self.theme = user.theme ?? "explore" /// default fallback
+        
+        // Load initial theme from CoreData
+        if let savedTheme = DataManager.shared.fetchTheme() {
+            self.theme = savedTheme
+        }
+        
+        // Listen for theme changes from prediction
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThemeChange),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    @objc private func handleThemeChange(_ notification: Notification) {
+        if let newTheme = notification.userInfo?["theme"] as? String {
+            DispatchQueue.main.async {
+                self.theme = newTheme
+            }
+        }
     }
     
     func switchTheme(to newTheme: String) {
-        self.theme = newTheme /// triggers didSet
+        theme = newTheme
+        DataManager.shared.saveTheme(theme: newTheme)
+        print("User manually switched theme to: \(newTheme)")
     }
     
     func switchUser(withID id: UUID) -> UserProfile {
@@ -62,4 +75,12 @@ class SettingsManager: ObservableObject {
             fatalError("Failed to switch user: \(error)")
         }
     }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+}
+
+extension Notification.Name {
+    static let themeDidChange = Notification.Name("themeDidChange")
 }

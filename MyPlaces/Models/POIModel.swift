@@ -75,7 +75,6 @@ class POIModel {
             /// Convert the Query result to an array of ArcGISFeatures
             let features = Array(result.features()).compactMap { $0 as? ArcGISFeature }
             self.POIs = features
-            print("Loaded \(features.count) POIs near user")
         } catch {
             print("Error loading relevant POIs: \(error.localizedDescription)")
         }

@@ -71,8 +71,8 @@ class ContentViewModel: ObservableObject {
     /// Asynchronous Loading and calculation of the relevant of POIs
     init() {
         Task {
-            await initializePOIModel()
             await updateTheme()
+            await initializePOIModel()
             await updateRelevance()
             await loadRelevanceScores()
         }
@@ -262,16 +262,25 @@ class ContentViewModel: ObservableObject {
         }
     }
     
-    /// Map theme choice by the ML Model
-    func updateTheme() async {
-        let cachedEnvironment = await variableManager.getCachedEnvironment()
-        let thematicChoice = thematicModelManager.predictTheme(
+    /// Update theme and notify UI on main thread
+    private func updateTheme() async {
+        let predictedTheme = await thematicModelManager.predictTheme(
             timeOfDay: variableManager.currentTimeOfDay(),
             dayOfWeek: variableManager.currentDay(),
-            environmentType: cachedEnvironment
+            environmentType: await variableManager.currentEnvironment()
         )
+        
         await MainActor.run {
-            dataManager.saveTheme(theme: thematicChoice)
+            // Save the newly predicted theme
+            dataManager.saveTheme(theme: predictedTheme)
+            
+            // Notify SettingsManager of the change
+            NotificationCenter.default.post(
+                name: .themeDidChange,
+                object: nil,
+                userInfo: ["theme": predictedTheme]
+            )
+            print("Theme predicted on startup: \(predictedTheme)")
         }
     }
     
@@ -318,6 +327,11 @@ class ContentViewModel: ObservableObject {
         var selectedPOIs: [ArcGISFeature] = []
         var visited = Set<Int64>()
         
+        /// Get current user theme and corresponding fclasses for boosting
+        let currentTheme = variableManager.currentUserTheme()
+        let themeClasses = getFclassesForTheme(currentTheme)
+        let themeBoost = 0.5 // Thematic Boost in percentage
+        
         for poi in pois {
             guard let fidAny = poi.attributes["fid"],
                   let fid = (fidAny as? NSNumber)?.int64Value,
@@ -341,8 +355,8 @@ class ContentViewModel: ObservableObject {
             
             /// Find the POI with highest relevance score
             let mostRelevant = group.max { a, b in
-                let scoreA = getRelevanceScore(for: a)
-                let scoreB = getRelevanceScore(for: b)
+                let scoreA = getEffectiveScore(for: a, themeClasses: themeClasses, themeBoost: themeBoost)
+                let scoreB = getEffectiveScore(for: b, themeClasses: themeClasses, themeBoost: themeBoost)
                 return scoreA < scoreB
             }
             
@@ -360,5 +374,20 @@ class ContentViewModel: ObservableObject {
         }
         
         return selectedPOIs
+    }
+    
+    /// Calculate effective score with theme boost for POI selection
+    private func getEffectiveScore(for poi: ArcGISFeature, themeClasses: [Double], themeBoost: Double) -> Double {
+        let baseScore = getRelevanceScore(for: poi)
+        
+        /// Check if POI matches current theme
+        guard let fclassRaw = poi.attributes["fclass"] as? String,
+              let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
+            return baseScore
+        }
+        
+        /// Apply theme boost if POI matches current theme (or if theme is "explore" which has empty fclasses)
+        let isOnTheme = themeClasses.isEmpty || themeClasses.contains(fclass)
+        return isOnTheme ? baseScore + themeBoost : baseScore
     }
 }

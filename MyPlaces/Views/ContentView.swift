@@ -77,8 +77,8 @@ struct ContentView: View {
     /// Variables for the pop-up logic
     @State private var identifyScreenPoint: CGPoint?
     @State private var popup: Popup?
-    @State private var showPopup = false
-    @State private var floatingPanelDetent: FloatingPanelDetent = .half
+    @State private var showPopupSheet = false
+    @State private var selectedDetent = PresentationDetent.medium
     
     @State private var selectedTheme: ThemeCategory = .explore
     
@@ -150,15 +150,48 @@ struct ContentView: View {
     // MARK: - View Body
     
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            mapLayer
-            toggleOverlay
-            themePicker
+        GeometryReader { geometry in
+            ZStack {
+                MapViewReader { proxy in
+                    ZStack {
+                        // Base map layer (bottom layer) - extends into safe area
+                        mapLayer
+                            .ignoresSafeArea(.all)
+                        
+                        // UI overlays (top layer) - respect safe area
+                        VStack {
+                            searchAndToggleOverlayForBody(proxy: proxy)  // Pass proxy here
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                themePicker
+                            }
+                        }
+                    }
+                }
+                // Safe area blur overlay (middle layer)
+                VStack {
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .frame(height: geometry.safeAreaInsets.top)
+                        .ignoresSafeArea(.all, edges: .top)
+                    Spacer()
+                }
+            }
         }
         .loadingOverlay(
-                    isPresented: $viewModel.isComputingRelevance,
-                    text: "Calculating relevance scores…"
+            isPresented: $viewModel.isComputingRelevance,
+            text: "Calculating relevance scores…"
         )
+        .sheet(isPresented: $showPopupSheet) { [popup] in
+            PopupView(popup: popup!, isPresented: $showPopupSheet)
+                .showCloseButton(true)
+                .padding()
+                .presentationDetents([.medium, .large], selection: $selectedDetent)
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.regularMaterial)
+                .presentationCornerRadius(20)
+        }
     }
     
     private var mapLayer: some View {
@@ -168,172 +201,176 @@ struct ContentView: View {
                     map: map,
                     graphicsOverlays: [model.graphicsOverlay]
                 )
-                    .locationDisplay(locationDisplay)
+                .locationDisplay(locationDisplay)
                 
-                    /// Single tap gesture to identify layers
-                    .onSingleTapGesture { screenPoint, _ in
-                        identifyScreenPoint = screenPoint
-                    }
+                /// Single tap gesture to identify layers
+                .onSingleTapGesture { screenPoint, _ in
+                    identifyScreenPoint = screenPoint
+                }
                 
-                    /// Start location display
-                    .task {
-                        let locationManager = CLLocationManager()
-                        if locationManager.authorizationStatus == .notDetermined {
-                            locationManager.requestWhenInUseAuthorization()
-                        }
-                        do {
-                            try await locationDisplay.dataSource.start()
-                            locationDisplay.initialZoomScale = 1_500
-                            locationDisplay.autoPanMode = .recenter
-                        } catch {
-                            self.failedToStart = true
-                        }
+                /// Start location display
+                .task {
+                    let locationManager = CLLocationManager()
+                    if locationManager.authorizationStatus == .notDetermined {
+                        locationManager.requestWhenInUseAuthorization()
                     }
-                    /// Identify the tapped feature
-                    .task(id: identifyScreenPoint) {
-                        guard let identifyScreenPoint,
-                              let identifyResult = try? await proxy.identifyLayers(
-                                screenPoint: identifyScreenPoint,
-                                tolerance: 10,
-                                returnPopupsOnly: true
-                              ) else { return }
-                        
-                        if let resultPopup = identifyResult.first?.popups.first {
-                            self.popup = resultPopup
-                            self.showPopup = self.popup != nil
-                            /// Extract the ArcGIS feature and record a click
-                            if let feature = resultPopup.geoElement as? ArcGISFeature {
-                                viewModel.recordPOIClick(poi: feature)
-                                print("Feature clicked: \(feature.attributes["osm_id"] as! String)")
-                                print("Relevance Score of POI Feature: ", viewModel.getRelevanceScore(for: feature))
-                            }
-                        }
+                    do {
+                        try await locationDisplay.dataSource.start()
+                        locationDisplay.initialZoomScale = 1_500
+                        locationDisplay.autoPanMode = .recenter
+                    } catch {
+                        self.failedToStart = true
                     }
-                    /// Floating panel for pop-ups
-                    .floatingPanel(
-                        selectedDetent: $floatingPanelDetent,
-                        horizontalAlignment: .leading,
-                        isPresented: $showPopup
-                    ) { [popup] in
-                        PopupView(popup: popup!, isPresented: $showPopup)
-                            .showCloseButton(true)
-                            .padding()
-                    }
-                    /// In case location fails
-                    .alert("Location display failed to start", isPresented: $failedToStart) {}
+                }
+                .task(id: identifyScreenPoint) {
+                    guard let identifyScreenPoint,
+                          let identifyResult = try? await proxy.identifyLayers(
+                            screenPoint: identifyScreenPoint,
+                            tolerance: 10,
+                            returnPopupsOnly: true
+                          ) else { return }
                     
-                    /// Switch Day/Nightmode
-                    .onChange(of: settingsManager.isNightMode) {
-                        print("Switching to \(settingsManager.isNightMode ? "night" : "day") mode")
-                        
-                        DispatchQueue.main.async {
-                            if settingsManager.isNightMode {
-                                let nightItem = PortalItem(
-                                    portal: .arcGISOnline(connection: .authenticated),
-                                    id: Item.ID("f2ac67c0a5564cdc90f29585354e6163")!
-                                )
-                                let nightLayer = ArcGISVectorTiledLayer(item: nightItem)
-                                map.basemap = Basemap(baseLayers: [nightLayer])
-                            } else {
-                                let dayItem = PortalItem(
-                                    portal: .arcGISOnline(connection: .authenticated),
-                                    id: Item.ID("56987f73d2b44570960d8a8f67bbe104")!
-                                )
-                                let dayLayer = ArcGISVectorTiledLayer(item: dayItem)
-                                map.basemap = Basemap(baseLayers: [dayLayer])
-                            }
+                    if let resultPopup = identifyResult.first?.popups.first {
+                        self.popup = resultPopup
+                        self.showPopupSheet = self.popup != nil  // Same pattern as your working code
+                        /// Extract the ArcGIS feature and record a click
+                        if let feature = resultPopup.geoElement as? ArcGISFeature {
+                            viewModel.recordPOIClick(poi: feature)
+                            print("Feature clicked: \(feature.attributes["osm_id"] as! String)")
+                            print("Relevance Score of POI Feature: ", viewModel.getRelevanceScore(for: feature))
                         }
                     }
-                    .onReceive(viewModel.$displayedPOIs) { newPOIs in
-                        // Extract the IDs of the relevant POIs
-                        let ids: [Int64] = newPOIs.compactMap {
-                            if let fid = $0.attributes["fid"] as? NSNumber {
-                                return fid.int64Value
-                            }
-                            return nil
-                        }
-                        
-                        // Convert the list of IDs into a comma-separated string
-                        let idString = ids.map { String($0) }.joined(separator: ",")
-                        let definitionExpression = "fid IN (\(idString))"
-                        
-                        // Load the original layer from ArcGIS Online
-                        let portalItem = PortalItem(
-                            portal: .arcGISOnline(connection: .authenticated),
-                            id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
-                        )
-                        let filteredLayer = FeatureLayer(item: portalItem)
-                        
-                        // Apply the filter
-                        filteredLayer.definitionExpression = definitionExpression
-                        
-                        // Remove any existing filtered layers
-                        DispatchQueue.main.async {
-                            for layer in map.operationalLayers {
-                                if let fl = layer as? FeatureLayer,
-                                   let existingItemID = fl.item?.id,
-                                   existingItemID == portalItem.id {
-                                    map.removeOperationalLayer(fl)
-                                }
-                            }
-                            map.addOperationalLayer(filteredLayer)
-                        }
-                    }
-                    .onChange(of: settingsManager.theme) {
-                        Task {
-                            await viewModel.updateRelevance()
-                            await viewModel.loadRelevanceScores()
-                        }
-                    }
+                }
+                /// In case location fails
+                .alert("Location display failed to start", isPresented: $failedToStart) {}
                 
-                VStack {
-                    HStack {
-                        TextField("Enter address", text: $searchText)
-                        Spacer()
-                        Button("Search") {
-                            Task {
-                                try await geocode(with: searchText, proxy: proxy)
-                            }
+                /// Switch Day/Nightmode
+                .onChange(of: settingsManager.isNightMode) {
+                    print("Switching to \(settingsManager.isNightMode ? "night" : "day") mode")
+                    
+                    DispatchQueue.main.async {
+                        if settingsManager.isNightMode {
+                            let nightItem = PortalItem(
+                                portal: .arcGISOnline(connection: .authenticated),
+                                id: Item.ID("f2ac67c0a5564cdc90f29585354e6163")!
+                            )
+                            let nightLayer = ArcGISVectorTiledLayer(item: nightItem)
+                            map.basemap = Basemap(baseLayers: [nightLayer])
+                        } else {
+                            let dayItem = PortalItem(
+                                portal: .arcGISOnline(connection: .authenticated),
+                                id: Item.ID("56987f73d2b44570960d8a8f67bbe104")!
+                            )
+                            let dayLayer = ArcGISVectorTiledLayer(item: dayItem)
+                            map.basemap = Basemap(baseLayers: [dayLayer])
                         }
                     }
-                    .padding(EdgeInsets(top: 60, leading: 10, bottom: 10, trailing: 10))
-                    .background(.thinMaterial, ignoresSafeAreaEdges: .horizontal)
+                }
+                .onReceive(viewModel.$displayedPOIs) { newPOIs in
+                    // Extract the IDs of the relevant POIs
+                    let ids: [Int64] = newPOIs.compactMap {
+                        if let fid = $0.attributes["fid"] as? NSNumber {
+                            return fid.int64Value
+                        }
+                        return nil
+                    }
                     
-                    Spacer()
+                    // Convert the list of IDs into a comma-separated string
+                    let idString = ids.map { String($0) }.joined(separator: ",")
+                    let definitionExpression = "fid IN (\(idString))"
+                    
+                    // Load the original layer from ArcGIS Online
+                    let portalItem = PortalItem(
+                        portal: .arcGISOnline(connection: .authenticated),
+                        id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
+                    )
+                    let filteredLayer = FeatureLayer(item: portalItem)
+                    
+                    // Apply the filter
+                    filteredLayer.definitionExpression = definitionExpression
+                    
+                    // Remove any existing filtered layers
+                    DispatchQueue.main.async {
+                        for layer in map.operationalLayers {
+                            if let fl = layer as? FeatureLayer,
+                               let existingItemID = fl.item?.id,
+                               existingItemID == portalItem.id {
+                                map.removeOperationalLayer(fl)
+                            }
+                        }
+                        map.addOperationalLayer(filteredLayer)
+                    }
+                }
+                .onChange(of: settingsManager.theme) {
+                    Task {
+                        await viewModel.updateRelevance()
+                        await viewModel.loadRelevanceScores()
+                    }
                 }
             }
         }
     }
     
-    private var toggleOverlay: some View {
-        HStack {
-            Spacer()
-            ZStack {
-                /// Background icons
-                HStack {
-                    Image(systemName: "sun.max.fill")
-                        .scaleEffect(0.7)
-                        .foregroundColor(.white)
-                    Spacer()
-                    Image(systemName: "moon.fill")
-                        .scaleEffect(0.7)
-                        .foregroundColor(.gray)
-                }
-                .padding(.horizontal, 16)
+    private func searchAndToggleOverlayForBody(proxy: MapViewProxy) -> some View {
+        VStack(spacing: 12) {
+            // Pill-shaped search bar
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                    .font(.system(size: 16, weight: .medium))
                 
-                /// Actual toggle
-                Toggle("", isOn: $settingsManager.isNightMode)
-                    .labelsHidden()
-                    .toggleStyle(SwitchToggleStyle(tint: .clear))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity) // Full overlay
+                TextField("Enter address", text: $searchText)
+                    .font(.system(size: 16, weight: .medium))
+                
+                if !searchText.isEmpty {
+                    Button("Search") {
+                        Task { try await geocode(with: searchText, proxy: proxy)
+                        }
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.blue)
+                }
             }
-            .frame(width: 50, height: 30) // Match this height to Toggle's actual size
-            .background(.thinMaterial)
-            .cornerRadius(16)
-            .padding(.top, 16)
-            .padding(.trailing, 16)
-            .clipped() // Ensure content stays within corners
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(.regularMaterial)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 2)
+            
+            // Day/Night toggle below search
+            HStack {
+                Spacer()
+                dayNightToggle
+            }
         }
+        .padding(.top, 20)
+        .padding(.horizontal, 20)
+    }
+    
+    private var dayNightToggle: some View {
+        ZStack {
+            // Background icons
+            HStack(spacing: 8) {
+                Image(systemName: "sun.max.fill")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(settingsManager.isNightMode ? .secondary : .gray)
+                
+                Image(systemName: "moon.fill")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(settingsManager.isNightMode ? .gray : .secondary)
+            }
+            .padding(.horizontal, 12)
+            
+            // Actual toggle
+            Toggle("", isOn: $settingsManager.isNightMode)
+                .labelsHidden()
+                .toggleStyle(SwitchToggleStyle(tint: .clear))
+                .scaleEffect(0.95)
+        }
+        .frame(height: 36)
+        .background(.regularMaterial)
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 1)
     }
     
     private var themeSelectionPicker: some View {
@@ -353,20 +390,24 @@ struct ContentView: View {
         VStack {
             Spacer()
             HStack {
-                Text("Theme:")
-                    .foregroundColor(.white)
-                
                 themeSelectionPicker
                     .padding(8)
                     .background(.thinMaterial)
-                    .cornerRadius(8)
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 1)
             }
             .padding()
         }
         .onAppear {
-            /// Sync with the latest theme from settingsManager
-            if let currentTheme = dataManager.fetchTheme(),
-               let category = ThemeCategory(rawValue: currentTheme) {
+            // Sync picker with saved theme on appear
+            if let savedTheme = dataManager.fetchTheme(),
+               let category = ThemeCategory(rawValue: savedTheme) {
+                selectedTheme = category
+            }
+        }
+        .onChange(of: settingsManager.theme) { newTheme in
+            // Update picker when theme changes externally
+            if let category = ThemeCategory(rawValue: newTheme) {
                 selectedTheme = category
             }
         }
