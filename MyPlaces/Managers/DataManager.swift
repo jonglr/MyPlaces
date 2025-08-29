@@ -60,7 +60,7 @@ class DataManager: ObservableObject {
         do {
             try context.save()
         } catch {
-            print("Error saving relevance score: \(error.localizedDescription)")
+            print("Error saving theme: \(error.localizedDescription)")
         }
     }
         

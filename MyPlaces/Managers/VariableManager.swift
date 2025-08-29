@@ -20,6 +20,13 @@ class VariableManager {
     private let dataManager = DataManager.shared
     private let context = PersistenceController.shared.container.viewContext
     
+    private var weatherTask: Task<Double, Never>?
+    private var environmentTask: Task<Double, Never>?
+    
+    /// Override location for search-based POI loading
+    private var searchLocationOverride: Point?
+    private var isUsingSearchLocation = false
+    
     // MARK: - Cache Properties
         
     private struct CachedData {
@@ -39,7 +46,6 @@ class VariableManager {
     // MARK: - Cache Management
         
     /// Refreshes cached data (weather, environment, user location) for relevance calculations
-    /// Should be called once per relevance score update cycle
     func refreshCachedData() async -> Bool {
         // Check if cache is still valid
         if let cached = cachedData, cached.isValid {
@@ -54,12 +60,17 @@ class VariableManager {
         
         print("Refreshing cached data...")
         
-        // Fetch weather and environment data concurrently
-        async let weatherTask = currentWeather(for: userLocation)
-        async let environmentTask = currentEnvironment(for: userLocation)
+        // cancel existing tasks
+        weatherTask?.cancel()
+        environmentTask?.cancel()
         
-        let weather = await weatherTask
-        let environment = await environmentTask
+        // Create new tasks
+        weatherTask = Task { await currentWeather(for: userLocation) }
+        environmentTask = Task { await currentEnvironment(for: userLocation) }
+                
+        // Wait for both
+        let weather = await weatherTask?.value ?? 2.0
+        let environment = await environmentTask?.value ?? 1.0
         
         // Cache the new data
         cachedData = CachedData(
@@ -388,34 +399,43 @@ class VariableManager {
         }
     }
     
-    /// Calculates the distance between the current location of the user and the POI Feature
-    func calculateDistanceToUser(origin poi: ArcGISFeature) async -> Double {
-        /// Use cached location if available, otherwise get current location
-        let userLocation: Point?
-        if let cached = cachedData, cached.isValid {
-            userLocation = cached.userLocation
-        } else {
-            userLocation = getCurrentLocationPoint()
+    /// Calculates the distance between the effective location and the POI Feature
+    func calculateDistanceToUser(origin poi: ArcGISFeature) -> Double {
+        /// Use effective location (search override or actual user location)
+        guard let point = getEffectiveLocationPoint() else {
+            print("No effective location available for distance calculation")
+            return 360.0
         }
         
-        guard let point = userLocation else { return 360.0 }
-        /// Get the POI Geometry and convert into a Point Feature, else return the max kilometer distance of the model training dataset
-        guard let poiPoint = poi.geometry as? Point else { return 360.0 }
-        /// Reproject both to WGS84 to ensure compatibility
+        /// Get the POI Geometry and convert into a Point Feature
+        guard let poiPoint = poi.geometry as? Point else {
+            print("POI geometry unavailable")
+            return 360.0
+        }
+        
+        /// Calculate distance using the effective location
         guard
             let userPoint = GeometryEngine.project(point, into: .webMercator),
             let featurePoint = GeometryEngine.project(poiPoint, into: .webMercator)
         else {
-            print("Projection failed")
+            print("Projection failed for distance calculation")
+            return 360.0
+        }
+
+        let distanceMeters = GeometryEngine.distance(from: userPoint, to: featurePoint)
+        let distanceKm = distanceMeters / 1000
+        
+        guard !distanceKm.isNaN else {
+            print("Distance calculation resulted in NaN")
             return 360.0
         }
         
-        let distanceMeters = GeometryEngine.distance(from: userPoint, to: featurePoint)
-        guard !distanceMeters.isNaN else {
-            print("distance is Nan")
-            return 360.0
+        // Debug log for context
+        if isUsingSearchLocation {
+            print("Distance from search location: \(distanceKm)km")
         }
-        return distanceMeters/1000
+        
+        return distanceKm
     }
         
     func getPOIDetails(poiID: UUID) -> (isFavorite: Double, clickCount: Double, daysAgo: Double) {
@@ -443,5 +463,26 @@ class VariableManager {
         }
         return 0.0
     }
-        
+    
+    
+    // MARK: - Search Conversion
+
+    /// Set search location override for calculations
+    func setSearchLocationOverride(_ location: Point?) {
+        searchLocationOverride = location
+        isUsingSearchLocation = location != nil
+        if let loc = location {
+            print("Search location override set to: \(loc.x), \(loc.y)")
+        } else {
+            print("Search location override cleared")
+        }
+    }
+
+    /// Get effective location (search override or actual user location)
+    func getEffectiveLocationPoint() -> Point? {
+        if isUsingSearchLocation, let searchLocation = searchLocationOverride {
+            return searchLocation
+        }
+        return getCurrentLocationPoint()
+    }
 }

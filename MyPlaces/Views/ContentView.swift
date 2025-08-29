@@ -15,45 +15,6 @@ import ArcGIS
 import ArcGISToolkit
 import CoreLocation
 
-// MARK: - Graphics for Search
-
-private class SearchModel: ObservableObject {
-    
-    let graphicsOverlay: GraphicsOverlay
-    
-    let locator = LocatorTask(
-        url: URL(string: "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer")!
-    )
-    let textGraphic: Graphic = {
-        let textSymbol = TextSymbol(
-            text: "",
-            color: UIColor(red: 6/255.0, green: 6/255.0, blue: 7/255.0, alpha: 0.8),
-            size: 25,
-            horizontalAlignment: .center,
-            verticalAlignment: .bottom
-        )
-        
-        /// Outline around text instead of background block
-        textSymbol.haloColor = .white
-        textSymbol.haloWidth = 1
-        
-        return Graphic(symbol: textSymbol)
-    }()
-    
-    let markerGraphic: Graphic = {
-        let markerSymbol = SimpleMarkerSymbol(
-            style: .circle,
-            color: UIColor(red: 78/255.0, green: 143/255.0, blue: 243/255.0, alpha: 1.0),
-            size: 13
-        )
-        return Graphic(symbol: markerSymbol)
-    }()
-    
-    init() {
-        graphicsOverlay = GraphicsOverlay(graphics: [textGraphic, markerGraphic])
-    }
-}
-
 
 struct ContentView: View {
     
@@ -73,6 +34,8 @@ struct ContentView: View {
     /// Variables for the location display & related states
     @State private var locationDisplay = LocationDisplay(dataSource: SystemLocationDataSource())
     @State private var failedToStart = false
+    
+    @State private var layerUpdateTask: Task<Void, Never>?
     
     /// Variables for the pop-up logic
     @State private var identifyScreenPoint: CGPoint?
@@ -128,23 +91,58 @@ struct ContentView: View {
     // MARK: - Geocode Function
     
     private func geocode(with searchText: String, proxy: MapViewProxy) async throws {
+        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print("Empty search text")
+            return
+        }
+        
         let parameters = GeocodeParameters()
         parameters.addResultAttributeName("*")
         parameters.maxResults = 1
-        parameters.outputSpatialReference = map.spatialReference
+        parameters.outputSpatialReference = .wgs84
         
-        let geocodeResults = try await model.locator.geocode(forSearchText: searchText, using: parameters)
-        if let firstResult = geocodeResults.first,
-           let location = firstResult.displayLocation,
-           let symbol = model.textGraphic.symbol as? TextSymbol {
-            
-            model.markerGraphic.geometry = location
-            model.textGraphic.geometry = location
-            symbol.text = firstResult.label
-            
-            /// Recenter map to current user location instead of geocode location
-            await proxy.setViewpointCenter(location, scale: 5000)
+        do {
+            let geocodeResults = try await model.locator.geocode(forSearchText: searchText, using: parameters)
+            if let firstResult = geocodeResults.first,
+               let location = firstResult.displayLocation,
+               let symbol = model.textGraphic.symbol as? TextSymbol {
+                
+                let wgs84Location: Point
+                            if location.spatialReference == .wgs84 {
+                                wgs84Location = location
+                            } else {
+                                guard let projected = GeometryEngine.project(location, into: .wgs84) else {
+                                    print("Failed to project coordinates to WGS84")
+                                    return
+                                }
+                                wgs84Location = projected
+                            }
+                
+                model.markerGraphic.geometry = location
+                model.textGraphic.geometry = location
+                symbol.text = firstResult.label
+                
+                /// Recenter map to geocoded location
+                await proxy.setViewpointCenter(location, scale: 5000)
+                
+                // Trigger POI reload with validated WGS84 coordinates
+                await handleSearchLocationChange(searchLocation: wgs84Location)
+                
+                print("Search completed for: \(firstResult.label)")
+            } else {
+                print("No results found for search: \(searchText)")
+            }
+        } catch {
+            print("Geocode error for '\(searchText)': \(error.localizedDescription)")
         }
+    }
+    
+    /// Handle POI reload when map location changes through search
+    private func handleSearchLocationChange(searchLocation: Point) async {
+        print("Triggering POI reload for search location: \(searchLocation.x), \(searchLocation.y)")
+        
+        // Notify the view model about the new search location
+        await viewModel.searchLocationChange(newLocation: searchLocation)
     }
     
     // MARK: - View Body
@@ -267,38 +265,45 @@ struct ContentView: View {
                     }
                 }
                 .onReceive(viewModel.$displayedPOIs) { newPOIs in
-                    // Extract the IDs of the relevant POIs
-                    let ids: [Int64] = newPOIs.compactMap {
-                        if let fid = $0.attributes["fid"] as? NSNumber {
-                            return fid.int64Value
-                        }
-                        return nil
-                    }
-                    
-                    // Convert the list of IDs into a comma-separated string
-                    let idString = ids.map { String($0) }.joined(separator: ",")
-                    let definitionExpression = "fid IN (\(idString))"
-                    
-                    // Load the original layer from ArcGIS Online
-                    let portalItem = PortalItem(
-                        portal: .arcGISOnline(connection: .authenticated),
-                        id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
-                    )
-                    let filteredLayer = FeatureLayer(item: portalItem)
-                    
-                    // Apply the filter
-                    filteredLayer.definitionExpression = definitionExpression
-                    
-                    // Remove any existing filtered layers
-                    DispatchQueue.main.async {
-                        for layer in map.operationalLayers {
-                            if let fl = layer as? FeatureLayer,
-                               let existingItemID = fl.item?.id,
-                               existingItemID == portalItem.id {
-                                map.removeOperationalLayer(fl)
+                    layerUpdateTask?.cancel()
+                    layerUpdateTask = Task {
+                        // Wait a bit to debounce rapid updates
+                        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                        guard !Task.isCancelled else { return }
+                        
+                        // Extract the IDs of the relevant POIs
+                        let ids: [Int64] = newPOIs.compactMap {
+                            if let fid = $0.attributes["fid"] as? NSNumber {
+                                return fid.int64Value
                             }
+                            return nil
                         }
-                        map.addOperationalLayer(filteredLayer)
+                        
+                        // Convert the list of IDs into a comma-separated string
+                        let idString = ids.map { String($0) }.joined(separator: ",")
+                        let definitionExpression = "fid IN (\(idString))"
+                        
+                        // Load the original layer from ArcGIS Online
+                        let portalItem = PortalItem(
+                            portal: .arcGISOnline(connection: .authenticated),
+                            id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
+                        )
+                        let filteredLayer = FeatureLayer(item: portalItem)
+                        
+                        // Apply the filter
+                        filteredLayer.definitionExpression = definitionExpression
+                        
+                        await MainActor.run {
+                            // Remove existing layers
+                            for layer in map.operationalLayers {
+                                if let fl = layer as? FeatureLayer,
+                                   let existingItemID = fl.item?.id,
+                                   existingItemID == portalItem.id {
+                                    map.removeOperationalLayer(fl)
+                                }
+                            }
+                            map.addOperationalLayer(filteredLayer)
+                        }
                     }
                 }
                 .onChange(of: settingsManager.theme) {
@@ -324,11 +329,26 @@ struct ContentView: View {
                 
                 if !searchText.isEmpty {
                     Button("Search") {
-                        Task { try await geocode(with: searchText, proxy: proxy)
+                        Task {
+                            try await geocode(with: searchText, proxy: proxy)
+                            searchText = "" // Clear search text after search
                         }
                     }
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.blue)
+                }
+                
+                // Add the return to user location button
+                if viewModel.isUsingSearchLocation {
+                    Button(action: {
+                        Task {
+                            await viewModel.returnToUserLocation()
+                        }
+                    }) {
+                        Image(systemName: "location.fill")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 14, weight: .semibold))
+                    }
                 }
             }
             .padding(.horizontal, 20)
@@ -405,9 +425,9 @@ struct ContentView: View {
                 selectedTheme = category
             }
         }
-        .onChange(of: settingsManager.theme) { newTheme in
+        .onChange(of: settingsManager.theme) {
             // Update picker when theme changes externally
-            if let category = ThemeCategory(rawValue: newTheme) {
+            if let category = ThemeCategory(rawValue: settingsManager.theme) {
                 selectedTheme = category
             }
         }
@@ -463,3 +483,43 @@ struct ContentView: View {
         ]
     }
 }
+
+// MARK: - Graphics for Search
+
+private class SearchModel: ObservableObject {
+    
+    let graphicsOverlay: GraphicsOverlay
+    
+    let locator = LocatorTask(
+        url: URL(string: "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer")!
+    )
+    let textGraphic: Graphic = {
+        let textSymbol = TextSymbol(
+            text: "",
+            color: UIColor(red: 6/255.0, green: 6/255.0, blue: 7/255.0, alpha: 0.8),
+            size: 25,
+            horizontalAlignment: .center,
+            verticalAlignment: .bottom
+        )
+        
+        /// Outline around text instead of background block
+        textSymbol.haloColor = .white
+        textSymbol.haloWidth = 1
+        
+        return Graphic(symbol: textSymbol)
+    }()
+    
+    let markerGraphic: Graphic = {
+        let markerSymbol = SimpleMarkerSymbol(
+            style: .circle,
+            color: UIColor(red: 78/255.0, green: 143/255.0, blue: 243/255.0, alpha: 1.0),
+            size: 13
+        )
+        return Graphic(symbol: markerSymbol)
+    }()
+    
+    init() {
+        graphicsOverlay = GraphicsOverlay(graphics: [textGraphic, markerGraphic])
+    }
+}
+

@@ -12,8 +12,9 @@
 import SwiftUI
 import CoreData
 import ArcGIS
+import CoreLocation
 
-class ContentViewModel: ObservableObject {
+class ContentViewModel: NSObject, ObservableObject {
     
     /// The POI Model is initialized asynchronously
     private var poiModel: POIModel?
@@ -23,6 +24,8 @@ class ContentViewModel: ObservableObject {
     @Published var displayedPOIs: [ArcGISFeature] = []
     /// Exposed flag to display the loading sign in the view model
     @Published var isComputingRelevance = false
+    /// Expose search location state to the UI
+    @Published var isUsingSearchLocation = false
     
     /// Core Data Managers
     private let context = PersistenceController.shared.container.viewContext
@@ -33,12 +36,23 @@ class ContentViewModel: ObservableObject {
     private let relevanceModelManager = RelevanceModelManager()
     private let thematicModelManager = ThematicModelManager()
     
+    /// Location monitoring for location changes
+    private let locationManager = CLLocationManager()
+    private var lastUpdateLocation: CLLocation?
+    private let significantDistanceThreshold: Double = 250.0 // meters
+    
+    /// Throttling for location updates
+    private var lastLocationUpdateTime: Date = Date(timeIntervalSince1970: 0)
+    private let locationUpdateThrottle: TimeInterval = 2.0 // Minimum 2 seconds between updates
+    private var currentSearchLocation: Point?
+    private var relevanceUpdateTask: Task<Void, Never>?
+    
     /// Search Attributes
     let graphicsOverlay = GraphicsOverlay()
     let locator = LocatorTask(
         url: URL(string: "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer")!
     )
-
+    
     // MARK: - Theme Mapping Helper
     
     /// Looks up the corresponding fclasses that match the thematic map choice
@@ -59,7 +73,7 @@ class ContentViewModel: ObservableObject {
         }
         return result
     }()
-
+    
     private func getFclassesForTheme(_ theme: Double) -> [Double] {
         let themeKey = String(Int(theme))
         return themeMappings[themeKey] ?? []
@@ -69,13 +83,17 @@ class ContentViewModel: ObservableObject {
     // MARK: - Initialization
     
     /// Asynchronous Loading and calculation of the relevant of POIs
-    init() {
-        Task {
-            await updateTheme()
+    override init() {
+        super.init()
+        
+        Task { @MainActor in
             await initializePOIModel()
+            await updateTheme()
             await updateRelevance()
             await loadRelevanceScores()
         }
+        
+        setupLocationMonitoring()
     }
     
     /// Async Initialization of the POIModel
@@ -108,19 +126,17 @@ class ContentViewModel: ObservableObject {
             /// Filter POIs that have relevance scores > 0.5
             let relevantPOIs = allPOIs.compactMap { poi -> (poi: ArcGISFeature, score: Double, fclass: Double)? in
                 let score = getRelevanceScore(for: poi)
-                guard score > 0.5 else { return nil }
+                guard score > 0.4 else { return nil }
                 
                 /// Get fclass for thematic filtering
                 guard let fclassRaw = poi.attributes["fclass"] as? String,
                       let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
                     return nil
                 }
-                
                 return (poi: poi, score: score, fclass: fclass)
             }
-            print("Filtered POIs before thematic filtering: \(relevantPOIs.count)")
-            
-            /// Separate POIs into themed (match user map theme) and non-themed groups
+                
+            /// Separate POIs into themed and non-themed groups
             let themedPOIs = relevantPOIs.filter { themeClasses.isEmpty || themeClasses.contains($0.fclass) }
             let nonThemedPOIs = relevantPOIs.filter { !themeClasses.isEmpty && !themeClasses.contains($0.fclass) }
             
@@ -146,7 +162,7 @@ class ContentViewModel: ObservableObject {
             print("Total POIs before aggregation: \(combinedPOIs.count)")
             
             /// Apply aggregation to remove overlapping POIs with the threshold of X meters
-            let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, threshold: 25)
+            let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, threshold: 30)
             print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
             
             /// Update displayed POIs
@@ -184,7 +200,8 @@ class ContentViewModel: ObservableObject {
         
         do {
             let scores = try context.fetch(request)
-            return scores.first?.score ?? 0.0
+                    let score = scores.first?.score ?? 0.0
+                    return score
         } catch {
             print("Error fetching relevance score: \(error)")
             return 0.0
@@ -220,51 +237,53 @@ class ContentViewModel: ObservableObject {
         let currentTheme = variableManager.currentUserTheme()
         
         for poi in allPOIs {
-                /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
-                guard let fclassRaw = poi.attributes["fclass"] as? String,
-                      let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
-                    continue
+            /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
+            guard let fclassRaw = poi.attributes["fclass"] as? String,
+                  let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
+                continue
+            }
+            
+            /// Convert the ID to a UUID
+            if let fidAny = poi.attributes["fid"],
+               let fid = (fidAny as? NSNumber)?.int64Value {
+                /// Transform the fid value into a UUID
+                let poiID = variableManager.uuidFromFID(fid)
+                
+                /// get the attributes for the score computation ot the poi
+                let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
+                let otherTags = poi.attributes["other_tags"] as? String ?? ""
+                let (open, hasOpeningHours) = variableManager.isOpen(otherTags: otherTags)
+                let distance = variableManager.calculateDistanceToUser(origin: poi)
+                let hasName = variableManager.hasName(poi: poi)
+                
+                /// compute the relevance Score using cached values
+                let score = relevanceModelManager.predictRelevance(
+                    distance: distance,
+                    speed: currentSpeed,
+                    weather: cachedWeather,
+                    isOpen: open,
+                    favorite: isFavorite,
+                    clickCount: clickCount,
+                    lastClickedDate: daysAgo,
+                    theme: currentTheme,
+                    fclass: fclass,
+                    hasName: hasName,
+                    hasOpeningHours: hasOpeningHours
+                )
+                /// Simple main thread dispatch
+                await MainActor.run {
+                    dataManager.saveRelevanceScore(for: poiID, score: score)
                 }
-                /// Convert the ID to a UUID
-                if let fidAny = poi.attributes["fid"],
-                   let fid = (fidAny as? NSNumber)?.int64Value {
-                    /// Transform the fid value into a UUID
-                    let poiID = variableManager.uuidFromFID(fid)
-                    
-                    /// get the attributes for the score computation ot the poi
-                    let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
-                    let (open, hasOpeningHours) = variableManager.isOpen(otherTags: poi.attributes["other_tags"] as! String)
-                    let distance = await variableManager.calculateDistanceToUser(origin: poi)
-                    let hasName = variableManager.hasName(poi: poi)
-                                        
-                    /// compute the relevance Score using cached values
-                    let score = relevanceModelManager.predictRelevance(
-                        distance: distance,
-                        speed: currentSpeed,
-                        weather: cachedWeather,
-                        isOpen: open,
-                        favorite: isFavorite,
-                        clickCount: clickCount,
-                        lastClickedDate: daysAgo,
-                        theme: currentTheme,
-                        fclass: fclass,
-                        hasName: hasName,
-                        hasOpeningHours: hasOpeningHours
-                    )
-                    /// Simple main thread dispatch
-                    await MainActor.run {
-                        dataManager.saveRelevanceScore(for: poiID, score: score)
-                    }
-                } else {
-                    print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
-                }
-
+            } else {
+                print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
+            }
+            
         }
     }
     
     /// Update theme and notify UI on main thread
     private func updateTheme() async {
-        let predictedTheme = await thematicModelManager.predictTheme(
+        let predictedTheme = thematicModelManager.predictTheme(
             timeOfDay: variableManager.currentTimeOfDay(),
             dayOfWeek: variableManager.currentDay(),
             environmentType: await variableManager.currentEnvironment()
@@ -294,29 +313,12 @@ class ContentViewModel: ObservableObject {
             dataManager.updatePOIInteraction(poiID: poiID, context: context, isFavorite: true)
         }
     }
-        
+    
     func recordPOIClick(poi: ArcGISFeature) {
         if let fidAny = poi.attributes["fid"],
            let fid = (fidAny as? NSNumber)?.int64Value {
             let poiID = variableManager.uuidFromFID(fid)
             dataManager.updatePOIInteraction(poiID: poiID, context: context)
-        }
-    }
-    
-    // MARK: - Cache Management
-        
-    /// Manually refresh cached data (useful for testing or when user changes location significantly)
-    func refreshCache() async {
-        print("Manually refreshing cache...")
-        variableManager.invalidateCache()
-        let success = await variableManager.refreshCachedData()
-        if success {
-            print("Cache refreshed successfully")
-            // Optionally recalculate relevance scores with new data
-            await updateRelevance()
-            await loadRelevanceScores()
-        } else {
-            print("Failed to refresh cache")
         }
     }
     
@@ -389,5 +391,243 @@ class ContentViewModel: ObservableObject {
         /// Apply theme boost if POI matches current theme (or if theme is "explore" which has empty fclasses)
         let isOnTheme = themeClasses.isEmpty || themeClasses.contains(fclass)
         return isOnTheme ? baseScore + themeBoost : baseScore
+    }
+    
+    // MARK: - Location Monitoring
+    
+    /// Setup location monitoring for significant movement detection
+    private func setupLocationMonitoring() {
+        locationManager.requestWhenInUseAuthorization()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.distanceFilter = 50.0 // Update every 50m for monitoring
+    }
+    
+    /// Handle location changes from either user movement or search
+    @MainActor
+    private func locationChange(
+        newLocation: Point? = nil,
+        clLocation: CLLocation? = nil,
+        isSearchTriggered: Bool = false,
+        forceUpdate: Bool = false
+    ) async {
+        if isUsingSearchLocation && !isSearchTriggered {
+            print("Ignoring location change - currently using search location")
+            return
+        }
+        
+        // Add throttling for ALL location changes
+        let now = Date()
+        guard forceUpdate || now.timeIntervalSince(lastLocationUpdateTime) >= locationUpdateThrottle else {
+            print("Location update throttled - only \(String(format: "%.1f", now.timeIntervalSince(lastLocationUpdateTime)))s since last update")
+            return
+        }
+        
+        // Ensure all required components are initialized
+        guard poiModel != nil else {
+            print("POI model not initialized yet, skipping location update")
+            return
+        }
+        
+        guard dataManager.currentUser() != nil else {
+            print("No current user, skipping location update")
+            return
+        }
+        
+        // Cancel any ongoing operations
+        relevanceUpdateTask?.cancel()
+        await relevanceUpdateTask?.value
+        
+        // Determine the location to use
+        let locationPoint: Point
+        if let searchPoint = newLocation {
+            // Validate search coordinates
+            guard abs(searchPoint.x) <= 180 && abs(searchPoint.y) <= 90 else {
+                print("Invalid search coordinates: \(searchPoint.x), \(searchPoint.y)")
+                return
+            }
+            locationPoint = searchPoint
+        } else if let clLoc = clLocation {
+            locationPoint = Point(
+                x: clLoc.coordinate.longitude,
+                y: clLoc.coordinate.latitude,
+                spatialReference: .wgs84
+            )
+        } else {
+            print("No valid location provided")
+            return
+        }
+        
+        // Update throttling timestamp
+        lastLocationUpdateTime = now
+        
+        // Check distance for user movement (not search)
+        if !isSearchTriggered, let currentCLLocation = clLocation {
+            if let lastLocation = lastUpdateLocation {
+                let distance = currentCLLocation.distance(from: lastLocation)
+                guard forceUpdate || distance >= significantDistanceThreshold else {
+                    print("User movement too small: \(Int(distance))m")
+                    return
+                }
+                print("User moved \(Int(distance))m - triggering update")
+            }
+            lastUpdateLocation = currentCLLocation
+        }
+        
+        // Update search location state before any operations
+        if isSearchTriggered {
+            self.isUsingSearchLocation = true
+            currentSearchLocation = locationPoint
+            variableManager.setSearchLocationOverride(locationPoint)
+            print("Search triggered location change to: \(locationPoint.x), \(locationPoint.y)")
+        } else if !isSearchTriggered {
+            // If this is a user location update, clear search override
+            self.isUsingSearchLocation = false
+            currentSearchLocation = nil
+            variableManager.setSearchLocationOverride(nil)
+            print("User location change to: \(locationPoint.x), \(locationPoint.y)")
+        }
+        
+        // Add delay to ensure all systems are ready
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        
+        // Reload POIs for the new location
+        await reloadPOIsForLocation(locationPoint)
+        
+        // Start relevance calculation
+        relevanceUpdateTask = Task {
+            guard !Task.isCancelled else { return }
+            await updateTheme()
+            
+            guard !Task.isCancelled else { return }
+            await updateRelevance()
+            
+            guard !Task.isCancelled else { return }
+            await loadRelevanceScores()
+            
+            print("Location workflow completed for: \(locationPoint.x), \(locationPoint.y)")
+        }
+        
+        await relevanceUpdateTask?.value
+    }
+    
+    /// Unified POI reloading for any location
+    @MainActor
+    private func reloadPOIsForLocation(_ location: Point) async {
+        guard let poiModel = self.poiModel else {
+            print("POI model not available for reloading")
+            return
+        }
+        
+        print("Reloading POIs for location: \(location.x), \(location.y)")
+        
+        // Load POIs around the specified location
+        await poiModel.loadPOIsAroundLocation(location: location)
+        
+        // Update our local POI array
+        self.allPOIs = poiModel.POIs
+        
+        print("Reloaded \(allPOIs.count) POIs for location")
+    }
+    
+    // MARK: - Public Interface Methods
+    
+    /// Handle location change triggered by search
+    @MainActor
+    func searchLocationChange(newLocation: Point) async {
+        await locationChange(
+            newLocation: newLocation,
+            isSearchTriggered: true
+        )
+    }
+    
+    /// Check if user has moved significantly and trigger updates
+    @MainActor
+    private func significantLocationChange(newLocation: CLLocation) async {
+        await locationChange(
+            clLocation: newLocation,
+            isSearchTriggered: false
+        )
+    }
+    
+    /// Return to using actual user location instead of search location
+    @MainActor
+    func returnToUserLocation() async {
+        print("Returning to actual user location")
+        
+        // Update published state
+        self.isUsingSearchLocation = false
+        currentSearchLocation = nil
+        
+        // Clear search location override
+        variableManager.setSearchLocationOverride(nil)
+        
+        // Get current user location and reload POIs
+        if let userLocation = variableManager.getCurrentLocationPoint() {
+            await locationChange(
+                newLocation: userLocation,
+                forceUpdate: true
+            )
+        }
+    }
+}
+    
+    // MARK: - CLLocationManagerDelegate Extension
+
+/// This is a CLLocationManagerDelegate extension that handles iOS location services callbacks. It's responsible for:
+/// Receiving location updates from iOS when the user moves
+/// Handling location permission changes
+/// Managing location service errors
+
+extension ContentViewModel: CLLocationManagerDelegate {
+    
+    /// Called automatically by iOS when user location changes
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let newLocation = locations.last else { return }
+        
+        guard !isUsingSearchLocation else {
+                    print("Ignoring location update - currently using search location override")
+                    return
+                }
+                
+                Task {
+                    await significantLocationChange(newLocation: newLocation)
+                }
+        
+        Task {
+            // Use the unified location handler for user movement
+            await locationChange(
+                clLocation: newLocation,
+                isSearchTriggered: false
+            )
+        }
+    }
+    
+    /// Called when location services encounter an error
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("Location manager failed with error: \(error.localizedDescription)")
+    }
+    
+    /// Called when location permission status changes
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
+            // Permission granted - start receiving location updates
+            locationManager.startUpdatingLocation()
+            print("Location authorization granted")
+            
+        case .denied, .restricted:
+            // Permission denied - handle gracefully
+            print("Location access denied or restricted")
+            
+        case .notDetermined:
+            // Permission not yet requested - ask for it
+            locationManager.requestWhenInUseAuthorization()
+            print("Requesting location authorization")
+            
+        @unknown default:
+            print("Unknown location authorization status")
+            break
+        }
     }
 }

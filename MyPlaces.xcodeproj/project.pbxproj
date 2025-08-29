@@ -58,7 +58,6 @@
 				MyPlacesApp.swift,
 				Resources/Assets.xcassets,
 				Resources/Relevance.mlmodel,
-				Resources/Thematic.mlmodel,
 				Views/ContentView.swift,
 				Views/LoadingOverlay.swift,
 				Views/OnboardingView.swift,
@@ -87,7 +86,6 @@
 				MyPlacesApp.swift,
 				Resources/Assets.xcassets,
 				Resources/Relevance.mlmodel,
-				Resources/Thematic.mlmodel,
 				Views/ContentView.swift,
 				Views/LoadingOverlay.swift,
 				Views/OnboardingView.swift,
@@ -483,7 +481,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = MyPlaces;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "The Location is used to calculate relevances of places around your position";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -513,7 +511,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = MyPlaces;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "The Location is used to calculate relevances of places around your position";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

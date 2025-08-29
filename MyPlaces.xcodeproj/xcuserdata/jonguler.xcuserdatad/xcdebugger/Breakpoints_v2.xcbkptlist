@@ -3,27 +3,4 @@
    uuid = "71D0B432-A3EF-4B80-8A3B-633420CBC986"
    type = "1"
    version = "2.0">
-   <Breakpoints>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.AddressBreakpoint">
-         <BreakpointContent
-            uuid = "FC3F294D-1755-4155-97A8-BAA43AE72D98"
-            shouldBeEnabled = "Yes"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            symbolName = "*0x104d88e00">
-            <Locations>
-               <Location
-                  uuid = "FC3F294D-1755-4155-97A8-BAA43AE72D98 - 3394a38bbfb4c3b5"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "dyld4::RuntimeState::partitionDelayLoads(std::__1::span&lt;dyld4::Loader const*, 18446744073709551615ul&gt;, std::__1::span&lt;dyld4::Loader const*, 18446744073709551615ul&gt;, lsl::Vector&lt;dyld4::Loader const*&gt;*)"
-                  moduleName = "dyld"
-                  usesParentBreakpointCondition = "Yes">
-               </Location>
-            </Locations>
-         </BreakpointContent>
-      </BreakpointProxy>
-   </Breakpoints>
 </Bucket>
