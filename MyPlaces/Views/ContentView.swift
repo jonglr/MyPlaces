@@ -324,7 +324,7 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                     .font(.system(size: 16, weight: .medium))
                 
-                TextField("Enter address", text: $searchText)
+                TextField("Search a Place...", text: $searchText)
                     .font(.system(size: 16, weight: .medium))
                 
                 if !searchText.isEmpty {
@@ -358,7 +358,7 @@ struct ContentView: View {
             .padding(.vertical, 14)
             .background(.regularMaterial)
             .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 2)
+            .shadow(color: .black.opacity(0.3), radius: 15, x: 0, y: 2)
             
             // Day/Night toggle below search
             HStack {
@@ -387,10 +387,10 @@ struct ContentView: View {
             // Actual toggle
             Toggle("", isOn: $settingsManager.isNightMode)
                 .labelsHidden()
+                .offset(x: -1)
                 .toggleStyle(SwitchToggleStyle(tint: .clear))
-                .scaleEffect(0.95)
         }
-        .frame(height: 36)
+        .frame(height: 38)
         .background(.regularMaterial)
         .clipShape(Capsule())
         .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 1)
@@ -418,7 +418,7 @@ struct ContentView: View {
                     .padding(8)
                     .background(.thinMaterial)
                     .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 1)
+                    .shadow(color: .black.opacity(0.2), radius: 30, x: 0, y: 1)
             }
             .padding()
         }
