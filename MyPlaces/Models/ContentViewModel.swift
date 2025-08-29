@@ -16,8 +16,8 @@ import CoreLocation
 
 class ContentViewModel: NSObject, ObservableObject {
     
-    /// The POI Model is initialized asynchronously
-    private var poiModel: POIModel?
+    /// The POI Model is initialized asynchronously (Favorites Panel needs to use it therefore not private)
+    var poiModel: POIModel?
     /// stores all the POIs temporarely, before the relevant ones get published in order to get displayed
     private var allPOIs: [ArcGISFeature] = []
     /// The visualization of the relevant POIs that get overlayed onto the rest of the POIs
@@ -560,6 +560,36 @@ class ContentViewModel: NSObject, ObservableObject {
     @MainActor
     func completeReturnToUserLocation(_ userLocation: Point) async {
         await locationChange(newLocation: userLocation, forceUpdate: true)
+    }
+    
+    @MainActor
+    func ensurePOIVisible(_ feature: ArcGISFeature) async {
+        // Check if POI is already in displayed POIs
+        if let fidAny = feature.attributes["fid"],
+           let fid = (fidAny as? NSNumber)?.int64Value {
+            
+            let variableManager = VariableManager()
+            let poiID = variableManager.uuidFromFID(fid)
+            
+            // If not in displayed POIs, temporarily add it with high relevance
+            let isDisplayed = displayedPOIs.contains { poi in
+                if let poiFidAny = poi.attributes["fid"],
+                   let poiFid = (poiFidAny as? NSNumber)?.int64Value {
+                    return poiFid == fid
+                }
+                return false
+            }
+            
+            if !isDisplayed {
+                // Temporarily add this POI to displayed POIs
+                var updatedPOIs = displayedPOIs
+                updatedPOIs.append(feature)
+                displayedPOIs = updatedPOIs
+                
+                // Ensure it has a high relevance score so it shows up
+                dataManager.saveRelevanceScore(for: poiID, score: 0.9)
+            }
+        }
     }
 }
     

@@ -49,6 +49,10 @@ struct ContentView: View {
     @StateObject private var model = SearchModel()
     @State private var searchText: String = ""
     
+    /// PopUp State Variables
+    @State private var showFavoritesPanel = true
+    @State private var favoritesPanelOffset: CGFloat = 0
+    
     init() {
         let basemapItemDay = PortalItem(
             portal: .arcGISOnline(connection: .authenticated),
@@ -153,22 +157,31 @@ struct ContentView: View {
             ZStack {
                 MapViewReader { proxy in
                     ZStack {
-                        // Base map layer (bottom layer) - extends into safe area
+                        /// Base map layer
                         mapLayer
                             .ignoresSafeArea(.all)
                         
-                        // UI overlays (top layer) - respect safe area
+                        /// UI overlays
                         VStack {
                             searchAndToggleOverlayForBody(proxy: proxy)  // Pass proxy here
                             Spacer()
                             HStack {
                                 Spacer()
-                                themePicker
+                            }
+                            .padding(.bottom, showFavoritesPanel ? 120 : 20)
+                        }
+                        /// Favorites panel
+                        VStack {
+                            Spacer()
+                            if showFavoritesPanel {
+                                FavoritesPanel(viewModel: viewModel)
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
                             }
                         }
+                        .ignoresSafeArea(.all, edges: .bottom)
                     }
                 }
-                // Safe area blur overlay (middle layer)
+                /// Safe area blur overlay
                 VStack {
                     Rectangle()
                         .fill(.ultraThinMaterial)
@@ -183,31 +196,45 @@ struct ContentView: View {
             text: "Calculating relevance scores…"
         )
         .sheet(isPresented: $showPopupSheet) { [popup] in
-            PopupView(popup: popup!, isPresented: $showPopupSheet)
-                .showCloseButton(true)
-                .padding()
-                .presentationDetents([.medium, .large], selection: $selectedDetent)
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.regularMaterial)
-                .presentationCornerRadius(20)
+            CustomPopupView(
+                popup: popup,
+                isPresented: $showPopupSheet,
+                viewModel: viewModel
+            )
+            .presentationDetents([.medium, .large], selection: $selectedDetent)
+            .presentationDragIndicator(.visible)
+            .presentationBackground(.regularMaterial)
+            .presentationCornerRadius(20)
         }
     }
     
     private var mapLayer: some View {
         MapViewReader { proxy in
-            ZStack(alignment: .topTrailing) {
-                MapView(
-                    map: map,
-                    graphicsOverlays: [model.graphicsOverlay]
-                )
-                .locationDisplay(locationDisplay)
-                
-                /// Single tap gesture to identify layers
+            // Break up the long modifier chain so the compiler can type-check faster
+            // by applying modifiers in stages to local variables.
+            let baseMap = MapView(
+                map: map,
+                graphicsOverlays: [model.graphicsOverlay]
+            )
+            .locationDisplay(locationDisplay)
+
+            // 1) Tap gesture
+            let withTap = baseMap
                 .onSingleTapGesture { screenPoint, _ in
                     identifyScreenPoint = screenPoint
+                    // Auto-collapse favorites panel when interacting with map
+                    withAnimation {
+                        if showFavoritesPanel {
+                            NotificationCenter.default.post(
+                                name: Notification.Name("collapseFavoritesPanel"),
+                                object: nil
+                            )
+                        }
+                    }
                 }
-                
-                /// Start location display
+
+            // 2) Start location display
+            let withStartTask = withTap
                 .task {
                     let locationManager = CLLocationManager()
                     if locationManager.authorizationStatus == .notDetermined {
@@ -221,6 +248,9 @@ struct ContentView: View {
                         self.failedToStart = true
                     }
                 }
+
+            // 3) Identify layers on tap
+            let withIdentifyTask = withStartTask
                 .task(id: identifyScreenPoint) {
                     guard let identifyScreenPoint,
                           let identifyResult = try? await proxy.identifyLayers(
@@ -228,24 +258,26 @@ struct ContentView: View {
                             tolerance: 10,
                             returnPopupsOnly: true
                           ) else { return }
-                    
+
                     if let resultPopup = identifyResult.first?.popups.first {
                         self.popup = resultPopup
-                        self.showPopupSheet = self.popup != nil  // Same pattern as your working code
-                        /// Extract the ArcGIS feature and record a click
+                        self.showPopupSheet = self.popup != nil
                         if let feature = resultPopup.geoElement as? ArcGISFeature {
                             viewModel.recordPOIClick(poi: feature)
                             print("Feature clicked: \(feature.attributes["osm_id"] as! String)")
                         }
                     }
                 }
-                /// In case location fails
+
+            // 4) Alert on failure
+            let withAlert = withIdentifyTask
                 .alert("Location display failed to start", isPresented: $failedToStart) {}
-                
-                /// Switch Day/Nightmode
+
+            // 5) Switch Day/Night mode
+            let withDayNight = withAlert
                 .onChange(of: settingsManager.isNightMode) {
                     print("Switching to \(settingsManager.isNightMode ? "night" : "day") mode")
-                    
+
                     DispatchQueue.main.async {
                         if settingsManager.isNightMode {
                             let nightItem = PortalItem(
@@ -264,37 +296,33 @@ struct ContentView: View {
                         }
                     }
                 }
+
+            // 6) React to POI updates
+            let withPOIReceive = withDayNight
                 .onReceive(viewModel.$displayedPOIs) { newPOIs in
                     layerUpdateTask?.cancel()
                     layerUpdateTask = Task {
-                        // Wait a bit to debounce rapid updates
-                        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                        try? await Task.sleep(nanoseconds: 300_000_000) // debounce 0.3s
                         guard !Task.isCancelled else { return }
-                        
-                        // Extract the IDs of the relevant POIs
+
                         let ids: [Int64] = newPOIs.compactMap {
                             if let fid = $0.attributes["fid"] as? NSNumber {
                                 return fid.int64Value
                             }
                             return nil
                         }
-                        
-                        // Convert the list of IDs into a comma-separated string
+
                         let idString = ids.map { String($0) }.joined(separator: ",")
                         let definitionExpression = "fid IN (\(idString))"
-                        
-                        // Load the original layer from ArcGIS Online
+
                         let portalItem = PortalItem(
                             portal: .arcGISOnline(connection: .authenticated),
                             id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
                         )
                         let filteredLayer = FeatureLayer(item: portalItem)
-                        
-                        // Apply the filter
                         filteredLayer.definitionExpression = definitionExpression
-                        
+
                         await MainActor.run {
-                            // Remove existing layers
                             for layer in map.operationalLayers {
                                 if let fl = layer as? FeatureLayer,
                                    let existingItemID = fl.item?.id,
@@ -306,13 +334,37 @@ struct ContentView: View {
                         }
                     }
                 }
+
+            // 7) Handle navigate-to-POI notifications
+            let withNavigateReceive = withPOIReceive
+                .onReceive(NotificationCenter.default.publisher(for: .navigateToPOI)) { notification in
+                    if let feature = notification.userInfo?["feature"] as? ArcGISFeature,
+                       let geometry = feature.geometry as? Point {
+                        Task {
+                            await viewModel.ensurePOIVisible(feature)
+                            await proxy.setViewpointCenter(geometry, scale: 800)
+
+                            // Present the popup directly for this feature instead of simulating a tap
+                            await MainActor.run {
+                                self.popup = Popup(geoElement: feature)
+                                self.showPopupSheet = true
+                                viewModel.recordPOIClick(poi: feature)
+                            }
+                        }
+                    }
+                }
+
+            // 8) React to theme changes
+            let withThemeChange = withNavigateReceive
                 .onChange(of: settingsManager.theme) {
                     Task {
                         await viewModel.updateRelevance()
                         await viewModel.loadRelevanceScores()
                     }
                 }
-            }
+
+            // Return the staged view
+            withThemeChange
         }
     }
     
@@ -339,19 +391,17 @@ struct ContentView: View {
                 }
                 
                 // Add the return to user location button
-                if viewModel.isUsingSearchLocation {
-                    Button(action: {
-                        Task { @MainActor in
-                            if let userPoint = viewModel.beginReturnToUserLocation() {    // clear override, get point
-                                await proxy.setViewpointCenter(userPoint, scale: 1500)     // zoom first
-                                await viewModel.completeReturnToUserLocation(userPoint)    // then load POIs/relevance
-                            }
+                Button(action: {
+                    Task { @MainActor in
+                        if let userPoint = viewModel.beginReturnToUserLocation() {    // clear override, get point
+                            await proxy.setViewpointCenter(userPoint, scale: 1500)     // zoom first
+                            await viewModel.completeReturnToUserLocation(userPoint)    // then load POIs/relevance
                         }
-                    }) {
-                        Image(systemName: "location.fill")
-                            .foregroundColor(.blue)
-                            .font(.system(size: 14, weight: .semibold))
                     }
+                }) {
+                    Image(systemName: "location.fill")
+                        .foregroundColor(.blue)
+                        .font(.system(size: 14, weight: .semibold))
                 }
             }
             .padding(.horizontal, 20)
@@ -359,6 +409,29 @@ struct ContentView: View {
             .background(.regularMaterial)
             .clipShape(Capsule())
             .shadow(color: .black.opacity(0.3), radius: 15, x: 0, y: 2)
+            
+            HStack {
+                Spacer()
+                themeSelectionPicker
+                    .padding(8)
+                    .background(.regularMaterial)
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.2), radius: 30, x: 0, y: 1)
+                    .onAppear {
+                        // Load effective theme from Core Data
+                        let state = DataManager.shared.fetchThemeState()
+                        let effective = state.userTheme ?? state.predictedTheme ?? "explore"
+                        selectedTheme = ThemeCategory(rawValue: effective) ?? .explore
+                        hasSyncedTheme = true
+                    }
+                    .onChange(of: settingsManager.theme) {
+                        // Keep picker in sync when theme changes externally (prediction or manual)
+                        if let category = ThemeCategory(rawValue: settingsManager.theme) {
+                            selectedTheme = category
+                        }
+                    }
+            }
+            
             
             // Day/Night toggle below search
             HStack {
@@ -391,7 +464,7 @@ struct ContentView: View {
                 .toggleStyle(SwitchToggleStyle(tint: .clear))
         }
         .frame(height: 38)
-        .background(.regularMaterial)
+        .background(.ultraThinMaterial)
         .clipShape(Capsule())
         .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 1)
     }
@@ -407,33 +480,6 @@ struct ContentView: View {
             guard hasSyncedTheme else { return }
             guard settingsManager.theme != selectedTheme.rawValue else { return }
                    settingsManager.switchTheme(to: selectedTheme.rawValue)
-        }
-    }
-
-    private var themePicker: some View {
-        VStack {
-            Spacer()
-            HStack {
-                themeSelectionPicker
-                    .padding(8)
-                    .background(.thinMaterial)
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.2), radius: 30, x: 0, y: 1)
-            }
-            .padding()
-        }
-        .onAppear {
-            // Load effective theme from Core Data
-            let state = DataManager.shared.fetchThemeState()
-            let effective = state.userTheme ?? state.predictedTheme ?? "explore"
-            selectedTheme = ThemeCategory(rawValue: effective) ?? .explore
-            hasSyncedTheme = true
-        }
-        .onChange(of: settingsManager.theme) {
-            // Keep picker in sync when theme changes externally (prediction or manual)
-            if let category = ThemeCategory(rawValue: settingsManager.theme) {
-                selectedTheme = category
-            }
         }
     }
     

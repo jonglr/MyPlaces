@@ -13,8 +13,6 @@ import SwiftUI
 
 class DataManager: ObservableObject {
     
-    @Published var hasUser: Bool = false
-    
     static let shared = DataManager(context: PersistenceController.shared.container.viewContext)
     private let context: NSManagedObjectContext
     
@@ -25,14 +23,15 @@ class DataManager: ObservableObject {
     
     // MARK: - User Profile Management
     
-    /// Fetch the Current User Profile (Singleton)
+    /// Fetch the Current User Profile
     func currentUser() -> UserProfile? {
         let request: NSFetchRequest<UserProfile> = UserProfile.fetchRequest()
         request.predicate = NSPredicate(format: "isActive == true")
         request.fetchLimit = 1
         
         do {
-            return try context.fetch(request).first
+            let user = try context.fetch(request).first
+            return user
         } catch {
             print("Error fetching active user profile: \(error.localizedDescription)")
             return nil
@@ -47,7 +46,20 @@ class DataManager: ObservableObject {
         newUser.email = email
         newUser.isActive = true
         saveContext()
-        hasUser = true
+    }
+    
+    /// Checks if there is a user in the database
+    func hasUser() -> Bool {
+        let request: NSFetchRequest<UserProfile> = UserProfile.fetchRequest()
+        request.fetchLimit = 1
+        
+        do {
+            let count = try context.count(for: request)
+            return count > 0
+        } catch {
+            print("Error checking if user exists: \(error)")
+            return false
+        }
     }
     
     /// Save Theme which was set by the User
@@ -106,7 +118,6 @@ class DataManager: ObservableObject {
         }
 
         do {
-            // Fetch or create the POI
             let poiFetch: NSFetchRequest<POI> = POI.fetchRequest()
             poiFetch.predicate = NSPredicate(format: "poiID == %@", poiID as CVarArg)
             poiFetch.fetchLimit = 1
@@ -182,6 +193,8 @@ class DataManager: ObservableObject {
         /// Update favorite status if provided
         if let isFavorite = isFavorite {
             poi.favorite = isFavorite
+            /// Post notification when favorite status changes
+            NotificationCenter.default.post(name: .favoritesDidChange, object: nil)
         }
         /// Update click count and last clicked date
         poi.clickCount += 1

@@ -23,23 +23,24 @@ struct MyPlacesApp: App {
     init(){
         ArcGISEnvironment.apiKey = APIKey(Keys.apiKey)
         
-        // Initialize DataManager first
+        /// Initialize DataManager
         let dataManager = DataManager(context: PersistenceController.shared.container.viewContext)
         self._dataManager = StateObject(wrappedValue: dataManager)
         
-        // Then SettingsManager with proper context
+        /// Initialize SettingsManager with proper context
         let settingsManager = SettingsManager(context: PersistenceController.shared.container.viewContext)
         self._settingsManager = StateObject(wrappedValue: settingsManager)
     }
     
     var body: some SwiftUI.Scene {
         WindowGroup {
-            if dataManager.hasUser {
+            if dataManager.hasUser() {
                 ContentView()
                     .environmentObject(dataManager)
                     .environmentObject(settingsManager)
                     .environment(\.managedObjectContext, persistenceController.container.viewContext)
             } else {
+                /// If there is no user initialized, the sign-up screen is shown
                 OnboardingView()
                     .environmentObject(dataManager)
             }
