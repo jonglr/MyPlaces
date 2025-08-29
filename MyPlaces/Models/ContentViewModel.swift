@@ -94,6 +94,14 @@ class ContentViewModel: NSObject, ObservableObject {
         }
         
         setupLocationMonitoring()
+        
+        // Listen for user changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleUserChange),
+            name: .userDidChange,
+            object: nil
+        )
     }
     
     /// Async Initialization of the POIModel
@@ -591,6 +599,19 @@ class ContentViewModel: NSObject, ObservableObject {
             }
         }
     }
+    
+    @objc private func handleUserChange() {
+        Task { @MainActor in
+            // Clear current data
+            displayedPOIs.removeAll()
+            
+            // Reload everything for the new user
+            await updateTheme()
+            await updateRelevance()
+            await loadRelevanceScores()
+        }
+    }
+    
 }
     
     // MARK: - CLLocationManagerDelegate Extension

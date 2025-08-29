@@ -3,6 +3,51 @@
 <plist version="1.0">
 <dict>
 	<key>top-level-items</key>
-	<array/>
+	<array>
+		<dict>
+			<key>destination</key>
+			<dict>
+				<key>location-parameters</key>
+				<dict>
+					<key>EndingColumnNumber</key>
+					<string>71</string>
+					<key>EndingLineNumber</key>
+					<string>348</string>
+					<key>StartingColumnNumber</key>
+					<string>71</string>
+					<key>StartingLineNumber</key>
+					<string>348</string>
+					<key>Timestamp</key>
+					<string>778190912.222908</string>
+				</dict>
+				<key>rebasable-url</key>
+				<dict>
+					<key>base</key>
+					<string>workspace</string>
+					<key>payload</key>
+					<dict>
+						<key>relative-path</key>
+						<string>MyPlaces/Views/ContentView.swift</string>
+					</dict>
+				</dict>
+			</dict>
+			<key>text-context</key>
+			<dict>
+				<key>focused</key>
+				<string></string>
+				<key>leading</key>
+				<string>                            // Present the popup directly for this feature instead of simulating a tap
+                            await MainActor.run {
+                                self.popup = Popup(geoElement: feature)</string>
+				<key>trailing</key>
+				<string>
+                                self.showPopupSheet = true
+                                viewModel.recordPOIClick(poi: feature)
+</string>
+			</dict>
+			<key>type</key>
+			<string>bookmark</string>
+		</dict>
+	</array>
 </dict>
 </plist>

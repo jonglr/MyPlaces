@@ -335,7 +335,7 @@ struct ContentView: View {
                     }
                 }
 
-            // 7) Handle navigate-to-POI notifications
+            // 7) Handle navigate-to-POI notifications for the favorites saved and clicked in the panel overlay
             let withNavigateReceive = withPOIReceive
                 .onReceive(NotificationCenter.default.publisher(for: .navigateToPOI)) { notification in
                     if let feature = notification.userInfo?["feature"] as? ArcGISFeature,
@@ -376,7 +376,7 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                     .font(.system(size: 16, weight: .medium))
                 
-                TextField("Search a Place...", text: $searchText)
+                TextField("Search a location...", text: $searchText)
                     .font(.system(size: 16, weight: .medium))
                 
                 if !searchText.isEmpty {

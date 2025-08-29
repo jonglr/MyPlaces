@@ -8,6 +8,7 @@
         <relationship name="relevance" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="RelevanceScore" inverseName="poi" inverseEntity="RelevanceScore"/>
     </entity>
     <entity name="RelevanceScore" representedClassName="RelevanceScore" syncable="YES">
+        <attribute name="isFavorite" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="poiID" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="score" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="userID" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>

@@ -1,3 +1,13 @@
+//
+//  PopUpView.swift
+//  MyPlaces
+//
+//  Created by Jon Guler on 24.08.2025.
+//
+
+/// **Class Functions**
+
+
 import SwiftUI
 import ArcGIS
 import ArcGISToolkit
@@ -59,20 +69,15 @@ struct CustomPopupView: View {
         let variableManager = VariableManager()
         let poiID = variableManager.uuidFromFID(fid)
         
-        // Update favorite status
-        isFavorite.toggle()
-        
-        // Update in Core Data
-        let context = PersistenceController.shared.container.viewContext
-        DataManager.shared.updatePOIInteraction(
-            poiID: poiID,
-            context: context,
-            isFavorite: isFavorite
-        )
+        // Toggle using the proper user-specific method
+        let newState = DataManager.shared.toggleUserFavorite(poiID: poiID)
+        isFavorite = newState
         
         // Trigger haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
+        
+        print("Toggled favorite for POI \(poiID): \(newState)")
     }
     
     private func loadFavoriteStatus() {
@@ -84,12 +89,9 @@ struct CustomPopupView: View {
         let variableManager = VariableManager()
         let poiID = variableManager.uuidFromFID(fid)
         
-        let context = PersistenceController.shared.container.viewContext
-        let (favorite, _, _) = DataManager.shared.getPOIInteraction(
-            poiID: poiID,
-            context: context
-        )
+        // Check user-specific favorite status
+        isFavorite = DataManager.shared.isUserFavorite(poiID: poiID)
         
-        isFavorite = favorite
+        print("Loaded favorite status for POI \(poiID): \(isFavorite)")
     }
 }

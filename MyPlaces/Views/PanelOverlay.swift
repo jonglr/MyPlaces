@@ -1,3 +1,13 @@
+//
+//  PanelOverlay.swift
+//  MyPlaces
+//
+//  Created by Jon Guler on 27.08.2025.
+//
+
+/// **Class Functions**
+
+
 import SwiftUI
 import CoreData
 import ArcGIS
@@ -11,10 +21,12 @@ struct FavoritesPanel: View {
     @State private var panelHeight: CGFloat = 180 /// Collapsed height
     @State private var isExpanded: Bool = false
     @State private var favoritePOIs: [FavoritePOI] = []
+    @State private var showingUserSwitcher = false
     
     let collapsedHeight: CGFloat = 180
     let expandedHeight: CGFloat = 600
     let minDragThreshold: CGFloat = 50
+    
     
     struct FavoritePOI: Identifiable {
         let id = UUID()
@@ -55,14 +67,36 @@ struct FavoritesPanel: View {
         .gesture(dragGesture)
         .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: panelHeight)
         .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: isExpanded)
+        // IMPORTANT: All listeners should be at the top level
         .onAppear {
-            // Also try loading after a delay to ensure POIs are loaded
+            loadFavorites()
+            // Also try loading after a short delay to ensure POIs are loaded
             Task {
                 try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 second delay
                 loadFavorites()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .favoritesDidChange)) { _ in
+            print("Favorites changed notification received")
+            loadFavorites()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .userDidChange)) { _ in
+            print("User changed notification received")
+            // Clear current favorites immediately
+            favoritePOIs = []
+            // Load new user's favorites
+            loadFavorites()
+            
+            // Also reload after a delay to ensure data is ready
+            Task {
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
+                loadFavorites()
+            }
+        }
+        .onChange(of: settingsManager.user.userID) {
+            print("User ID changed in settings")
+            // Clear and reload when user changes
+            favoritePOIs = []
             loadFavorites()
         }
     }
@@ -98,7 +132,7 @@ struct FavoritesPanel: View {
             Divider()
             
             Button(action: {
-                // Add user switching logic here if needed
+                showingUserSwitcher = true
             }) {
                 Label("Switch User", systemImage: "person.2.fill")
             }
@@ -111,7 +145,7 @@ struct FavoritesPanel: View {
         } label: {
             ZStack {
                 Circle()
-                    .fill(Color.gray.gradient)
+                    .fill(avatarGradient)
                     .frame(width: 40, height: 40)
                 
                 Text(settingsManager.user.name?.prefix(1).uppercased() ?? "U")
@@ -119,6 +153,32 @@ struct FavoritesPanel: View {
                     .foregroundColor(.white)
             }
         }
+        .sheet(isPresented: $showingUserSwitcher) {
+            UserSwitcherView()
+                .environmentObject(settingsManager)
+                .environmentObject(dataManager)
+        }
+    }
+                        
+    private var avatarGradient: LinearGradient {
+        let name = settingsManager.user.name ?? ""
+        let hash = abs(name.hashValue)
+        let colorSets: [[Color]] = [
+            [.blue, .cyan],
+            [.purple, .pink],
+            [.orange, .red],
+            [.green, .mint],
+            [.indigo, .purple],
+            [.pink, .orange],
+            [.teal, .blue],
+            [.yellow, .orange]
+        ]
+        let colors = colorSets[hash % colorSets.count]
+        return LinearGradient(
+            colors: colors,
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
     
     private var horizontalFavoritesSection: some View {
@@ -190,7 +250,7 @@ struct FavoritesPanel: View {
             .frame(width: 100, height: 70)
             .background(
                 LinearGradient(
-                    colors: [Color.blue, Color.blue.opacity(0.5)],
+                    colors: [Color.blue, Color.blue.opacity(0.8)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -254,34 +314,29 @@ struct FavoritesPanel: View {
     }
     
     private func loadFavorites() {
-        let request: NSFetchRequest<POI> = POI.fetchRequest()
-        request.predicate = NSPredicate(format: "favorite == true")
+        // Get current user's favorites using the proper user-specific method
+        let userFavoriteScores = dataManager.getUserFavorites()
+        print("Found \(userFavoriteScores.count) favorites for current user")
         
-        do {
-            let favoritedPOIs = try PersistenceController.shared.container.viewContext.fetch(request)
-            
-            // Map to display model
-            var favorites: [FavoritePOI] = []
-            for poi in favoritedPOIs {
-                // Find corresponding feature in viewModel's allPOIs
-                if let poiID = poi.poiID,
-                   let feature = findFeatureForPOI(poiID: poiID) {
-                    let name = feature.attributes["name"] as? String ?? "Unknown"
-                    let fclass = feature.attributes["fclass"] as? String ?? ""
-                    
-                    favorites.append(FavoritePOI(
-                        poiID: poiID,
-                        name: name,
-                        fclass: fclass,
-                        feature: feature
-                    ))
-                }
+        // Map to display model
+        var favorites: [FavoritePOI] = []
+        for score in userFavoriteScores {
+            if let poiID = score.poiID,
+               let feature = findFeatureForPOI(poiID: poiID) {
+                let name = feature.attributes["name"] as? String ?? "Unknown"
+                let fclass = feature.attributes["fclass"] as? String ?? ""
+                
+                favorites.append(FavoritePOI(
+                    poiID: poiID,
+                    name: name,
+                    fclass: fclass,
+                    feature: feature
+                ))
             }
-            
-            favoritePOIs = favorites
-        } catch {
-            print("Error loading favorites: \(error)")
         }
+        
+        print("Successfully loaded \(favorites.count) favorites with features")
+        favoritePOIs = favorites.sorted { $0.name < $1.name }  // Sort alphabetically
     }
     
     private func findFeatureForPOI(poiID: UUID) -> ArcGISFeature? {
