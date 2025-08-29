@@ -550,25 +550,19 @@ class ContentViewModel: NSObject, ObservableObject {
         )
     }
     
-    /// Return to using actual user location instead of search location
+    /// clear search state and return the user's current Point (no loading yet)
     @MainActor
-    func returnToUserLocation() async {
-        print("Returning to actual user location")
-        
-        // Update published state
-        self.isUsingSearchLocation = false
+    func beginReturnToUserLocation() -> Point? {
+        isUsingSearchLocation = false
         currentSearchLocation = nil
-        
-        // Clear search location override
         variableManager.setSearchLocationOverride(nil)
-        
-        // Get current user location and reload POIs
-        if let userLocation = variableManager.getCurrentLocationPoint() {
-            await locationChange(
-                newLocation: userLocation,
-                forceUpdate: true
-            )
-        }
+        return variableManager.getCurrentLocationPoint()
+    }
+
+    /// Load relevance/POIs at the given point
+    @MainActor
+    func completeReturnToUserLocation(_ userLocation: Point) async {
+        await locationChange(newLocation: userLocation, forceUpdate: true)
     }
 }
     

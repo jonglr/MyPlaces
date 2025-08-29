@@ -123,7 +123,7 @@ struct ContentView: View {
                 symbol.text = firstResult.label
                 
                 /// Recenter map to geocoded location
-                await proxy.setViewpointCenter(location, scale: 5000)
+                await proxy.setViewpointCenter(location, scale: 3000)
                 
                 // Trigger POI reload with validated WGS84 coordinates
                 await handleSearchLocationChange(searchLocation: wgs84Location)
@@ -341,8 +341,11 @@ struct ContentView: View {
                 // Add the return to user location button
                 if viewModel.isUsingSearchLocation {
                     Button(action: {
-                        Task {
-                            await viewModel.returnToUserLocation()
+                        Task { @MainActor in
+                            if let userPoint = viewModel.beginReturnToUserLocation() {    // clear override, get point
+                                await proxy.setViewpointCenter(userPoint, scale: 1500)     // zoom first
+                                await viewModel.completeReturnToUserLocation(userPoint)    // then load POIs/relevance
+                            }
                         }
                     }) {
                         Image(systemName: "location.fill")
