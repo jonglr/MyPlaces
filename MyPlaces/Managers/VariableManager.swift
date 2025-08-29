@@ -23,9 +23,31 @@ class VariableManager {
     private var weatherTask: Task<Double, Never>?
     private var environmentTask: Task<Double, Never>?
     
+    private var currentThemeString: String = "explore"
+    
     /// Override location for search-based POI loading
     private var searchLocationOverride: Point?
     private var isUsingSearchLocation = false
+    
+    init() {
+        currentThemeString = resolveEffectiveTheme()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(onThemeChanged(_:)),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    
+    @objc private func onThemeChanged(_ n: Notification) {
+        currentThemeString = resolveEffectiveTheme()
+        print("Effective theme = \(currentThemeString)")
+    }
+    
+    private func resolveEffectiveTheme() -> String {
+        let s = DataManager.shared.fetchThemeState()
+        return s.userTheme ?? s.predictedTheme ?? "explore"
+    }
     
     // MARK: - Cache Properties
         
@@ -36,8 +58,8 @@ class VariableManager {
         let timestamp: Date
         
         var isValid: Bool {
-            // Cache is valid for 1 hour (3600 seconds)
-            return Date().timeIntervalSince(timestamp) < 3600
+            // Cache is valid for 15s
+            return Date().timeIntervalSince(timestamp) < 15
         }
     }
         
@@ -51,10 +73,10 @@ class VariableManager {
         if let cached = cachedData, cached.isValid {
             return true
         }
-        
+
         // Get current user location
-        guard let userLocation = getCurrentLocationPoint() else {
-            print("Failed to get user location for cache refresh")
+        guard let currentLocation = getEffectiveLocationPoint() else {
+            print("Failed to get location for cache refresh")
             return false
         }
         
@@ -65,8 +87,8 @@ class VariableManager {
         environmentTask?.cancel()
         
         // Create new tasks
-        weatherTask = Task { await currentWeather(for: userLocation) }
-        environmentTask = Task { await currentEnvironment(for: userLocation) }
+        weatherTask = Task { await currentWeather(for: currentLocation) }
+        environmentTask = Task { await currentEnvironment(for: currentLocation) }
                 
         // Wait for both
         let weather = await weatherTask?.value ?? 2.0
@@ -76,7 +98,7 @@ class VariableManager {
         cachedData = CachedData(
             weather: weather,
             environment: environment,
-            userLocation: userLocation,
+            userLocation: currentLocation,
             timestamp: Date()
         )
         
@@ -98,14 +120,6 @@ class VariableManager {
             return cachedData?.environment ?? 1.0
         }
         return 1.0 // Default: rural
-    }
-        
-    /// Returns cached user location, refreshes cache if needed
-    func getCachedUserLocation() async -> Point? {
-        if await refreshCachedData() {
-            return cachedData?.userLocation
-        }
-        return nil
     }
         
     /// Forces cache invalidation (useful for testing or manual refresh)
@@ -140,21 +154,11 @@ class VariableManager {
     
     /// Fetches and converts the Thematic Choice of the model (or user)
     func currentUserTheme() -> Double {
-        /// Fetch the current theme as a string
-        guard let currentTheme = dataManager.fetchTheme() else {
-            return 5.0 // Default to 'explore' theme
-        }
-        /// Map the theme string to the corresponding Double value
-        let themeMapping: [String: Double] = [
-            "shopping": 0.0,
-            "food": 1.0,
-            "public transport": 2.0,
-            "culture": 3.0,
-            "outdoor": 4.0,
-            "explore": 5.0
+        let map: [String: Double] = [
+            "shopping": 0, "food": 1, "public transport": 2,
+            "culture": 3, "outdoor": 4, "explore": 5
         ]
-        /// Return the mapped value, or 5.0 (explore) if the theme is not recognized
-        return themeMapping[currentTheme, default: 5.0]
+        return map[currentThemeString, default: 5]
     }
     
     // MARK: - Basic Location Variables
@@ -428,11 +432,6 @@ class VariableManager {
         guard !distanceKm.isNaN else {
             print("Distance calculation resulted in NaN")
             return 360.0
-        }
-        
-        // Debug log for context
-        if isUsingSearchLocation {
-            print("Distance from search location: \(distanceKm)km")
         }
         
         return distanceKm

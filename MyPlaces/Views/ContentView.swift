@@ -44,6 +44,7 @@ struct ContentView: View {
     @State private var selectedDetent = PresentationDetent.medium
     
     @State private var selectedTheme: ThemeCategory = .explore
+    @State private var hasSyncedTheme = false
     
     @StateObject private var model = SearchModel()
     @State private var searchText: String = ""
@@ -235,7 +236,6 @@ struct ContentView: View {
                         if let feature = resultPopup.geoElement as? ArcGISFeature {
                             viewModel.recordPOIClick(poi: feature)
                             print("Feature clicked: \(feature.attributes["osm_id"] as! String)")
-                            print("Relevance Score of POI Feature: ", viewModel.getRelevanceScore(for: feature))
                         }
                     }
                 }
@@ -398,17 +398,18 @@ struct ContentView: View {
     
     private var themeSelectionPicker: some View {
         Picker("Theme", selection: $selectedTheme) {
-            ForEach(ThemeCategory.allCases) { theme in
-                Text(theme.rawValue.capitalized)
-                    .tag(theme)
+            ForEach(ThemeCategory.allCases, id: \.self) { theme in
+                Text(theme.rawValue.capitalized).tag(theme)
             }
         }
         .pickerStyle(.menu)
         .onChange(of: selectedTheme) {
-            settingsManager.switchTheme(to: selectedTheme.rawValue)
+            guard hasSyncedTheme else { return }
+            guard settingsManager.theme != selectedTheme.rawValue else { return }
+                   settingsManager.switchTheme(to: selectedTheme.rawValue)
         }
     }
-    
+
     private var themePicker: some View {
         VStack {
             Spacer()
@@ -422,14 +423,14 @@ struct ContentView: View {
             .padding()
         }
         .onAppear {
-            // Sync picker with saved theme on appear
-            if let savedTheme = dataManager.fetchTheme(),
-               let category = ThemeCategory(rawValue: savedTheme) {
-                selectedTheme = category
-            }
+            // Load effective theme from Core Data
+            let state = DataManager.shared.fetchThemeState()
+            let effective = state.userTheme ?? state.predictedTheme ?? "explore"
+            selectedTheme = ThemeCategory(rawValue: effective) ?? .explore
+            hasSyncedTheme = true
         }
         .onChange(of: settingsManager.theme) {
-            // Update picker when theme changes externally
+            // Keep picker in sync when theme changes externally (prediction or manual)
             if let category = ThemeCategory(rawValue: settingsManager.theme) {
                 selectedTheme = category
             }

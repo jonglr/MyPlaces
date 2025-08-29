@@ -35,6 +35,7 @@ class ThematicModelManager {
             
             /// Convert the integer output to the corresponding theme string
             let themeIndex = Int(output.themeLabel) // Assuming themeLabel is a number
+            print ("AAAAAAAAAAAAA \(themeIndex)")
             return themeLookup[themeIndex] ?? "explore" // Return "explore" as fallback
             
         } catch {

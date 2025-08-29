@@ -291,15 +291,15 @@ class ContentViewModel: NSObject, ObservableObject {
         
         await MainActor.run {
             // Save the newly predicted theme
-            dataManager.saveTheme(theme: predictedTheme)
+            dataManager.setPredictedTheme(theme: predictedTheme)
+            dataManager.clearUserTheme()
             
             // Notify SettingsManager of the change
             NotificationCenter.default.post(
                 name: .themeDidChange,
                 object: nil,
-                userInfo: ["theme": predictedTheme]
+                userInfo: ["theme": predictedTheme, "source": "prediction"]
             )
-            print("Theme predicted on startup: \(predictedTheme)")
         }
     }
     
@@ -518,9 +518,6 @@ class ContentViewModel: NSObject, ObservableObject {
             print("POI model not available for reloading")
             return
         }
-        
-        print("Reloading POIs for location: \(location.x), \(location.y)")
-        
         // Load POIs around the specified location
         await poiModel.loadPOIsAroundLocation(location: location)
         

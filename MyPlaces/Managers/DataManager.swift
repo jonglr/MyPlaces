@@ -50,27 +50,45 @@ class DataManager: ObservableObject {
         hasUser = true
     }
     
-    /// Save Theme for the User
-    func saveTheme(theme: String) {
-        guard let user = currentUser() else {
-            print("No valid user found.")
-            return
-        }
-        user.theme = theme
+    /// Save Theme which was set by the User
+    func setUserTheme(theme: String) {
+        guard let user = currentUser() else { print("No valid user found.") ; return }
+        user.userTheme = theme
         do {
             try context.save()
-        } catch {
-            print("Error saving theme: \(error.localizedDescription)")
-        }
+        } catch { print("Error saving theme: \(error.localizedDescription)") }
+    }
+    
+    /// Save Theme which was predicted for the User
+    func setPredictedTheme(theme: String) {
+        guard let user = currentUser() else { print("No valid user found.") ; return }
+        user.predictedTheme = theme
+        do {
+            try context.save()
+        } catch { print("Error saving theme: \(error.localizedDescription)") }
+    }
+    
+    /// Clear the userTheme variable in Core Data during a location change
+    func clearUserTheme() {
+        guard let user = currentUser() else { print("No valid user found.") ; return }
+        user.userTheme = nil
+        do {
+            try context.save()
+        } catch { print("Error saving theme: \(error.localizedDescription)") }
     }
         
-    /// Fetch Theme for the User
-    func fetchTheme() -> String? {
-        guard let user = currentUser() else {
-            print("No valid user found")
-            return nil
-        }
-        return user.theme
+    struct ThemeState {
+        let userTheme: String?
+        let predictedTheme: String?
+    }
+
+    /// Return the two theme attributes
+    func fetchThemeState() -> ThemeState {
+        let user = currentUser()
+        return ThemeState(
+            userTheme: user?.userTheme,
+            predictedTheme: user?.predictedTheme
+        )
     }
     
     
@@ -175,7 +193,6 @@ class DataManager: ObservableObject {
     func getPOIInteraction(poiID: UUID, context: NSManagedObjectContext) -> (isFavorite: Bool, clickCount: Int32, lastClickedDate: Date) {
         guard let poi = fetchPOI(poiID: poiID, context: context) else {
             /// If POI not found to retrieve interactions
-            print("No interactions with this POI yet.")
             return (false, 0, Calendar.current.date(byAdding: .day, value: -600, to: Date()) ?? Date())
         }
         let fallbackDate = Calendar.current.date(byAdding: .day, value: -600, to: Date()) ?? Date()

@@ -132,7 +132,6 @@ class POIModel {
             await MainActor.run {
                 self.POIs.removeAll()
                 self.POIs = features
-                print("Successfully loaded \(features.count) POIs around location (\(point.x), \(point.y))")
             }
             
         } catch {

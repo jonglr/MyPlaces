@@ -18,8 +18,9 @@
         <attribute name="email" optional="YES" attributeType="String"/>
         <attribute name="isActive" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="name" optional="YES" attributeType="String"/>
-        <attribute name="theme" optional="YES" attributeType="String"/>
+        <attribute name="predictedTheme" optional="YES" attributeType="String"/>
         <attribute name="userID" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="userTheme" optional="YES" attributeType="String"/>
         <relationship name="relevanceScores" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="RelevanceScore" inverseName="user" inverseEntity="RelevanceScore"/>
     </entity>
 </model>

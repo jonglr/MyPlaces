@@ -27,9 +27,8 @@ class SettingsManager: ObservableObject {
         self.user = user
         
         // Load initial theme from CoreData
-        if let savedTheme = DataManager.shared.fetchTheme() {
-            self.theme = savedTheme
-        }
+        let state = DataManager.shared.fetchThemeState()
+        self.theme = state.userTheme ?? state.predictedTheme ?? "explore"
         
         // Listen for theme changes from prediction
         NotificationCenter.default.addObserver(
@@ -40,17 +39,20 @@ class SettingsManager: ObservableObject {
         )
     }
     @objc private func handleThemeChange(_ notification: Notification) {
-        if let newTheme = notification.userInfo?["theme"] as? String {
-            DispatchQueue.main.async {
-                self.theme = newTheme
-            }
-        }
+        guard let newTheme = notification.userInfo?["theme"] as? String else { return }
+        DispatchQueue.main.async { self.theme = newTheme }
     }
     
     func switchTheme(to newTheme: String) {
-        theme = newTheme
-        DataManager.shared.saveTheme(theme: newTheme)
-        print("User manually switched theme to: \(newTheme)")
+        DataManager.shared.setUserTheme(theme:newTheme)
+        self.theme = newTheme
+
+        NotificationCenter.default.post(
+            name: .themeDidChange,
+            object: nil,
+            userInfo: ["theme": newTheme, "source": "manual"]
+        )
+        print("User selected theme: \(newTheme)")
     }
     
     func switchUser(withID id: UUID) -> UserProfile {
