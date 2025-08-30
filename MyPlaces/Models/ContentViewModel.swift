@@ -6,7 +6,18 @@
 //
 
 /// **Class Functions**
-/// Manages user interactions with the MapView
+/// Manages user interactions with the MapView and processes the whole logic behind it.
+/// This file is separated into different functionality topics:
+/// - Variable Declaration
+/// - Initialization
+/// - Relevance Predictions
+/// - Thematic Predictions
+/// - POI Handling
+/// - POI Aggregation
+/// - User Interactions
+/// - Location Monitoring
+/// - Location Change Public Interface Methods (related to the Location Monitoring)
+/// - CLLocationManagerDelegate Extension
 
 import SwiftUI
 import CoreData
@@ -14,34 +25,30 @@ import ArcGIS
 import CoreLocation
 
 class ContentViewModel: NSObject, ObservableObject {
+
+    // MARK: - Variable Declaration
+    
     
     /// The POI Model is initialized asynchronously (Favorites Panel needs to use it therefore not private)
     var poiModel: POIModel?
-    /// stores all the POIs temporarely, before the relevant ones get published in order to get displayed
-    private var allPOIs: [ArcGISFeature] = []
-    /// Cache for favorite POIs that are outside normal loading area
-    private var remoteFavoriteCache: [Int64: ArcGISFeature] = [:]
-    /// The visualization of the relevant POIs that get overlayed onto the rest of the POIs
-    @Published var displayedPOIs: [ArcGISFeature] = []
-    
-    /// Exposed flag to display the loading sign in the view model
-    @Published var isComputingRelevance = false
-    /// Expose search location state to the UI
-    @Published var isUsingSearchLocation = false
-    
-    /// Core Data Managers
-    private let context = PersistenceController.shared.container.viewContext
-    private let dataManager = DataManager.shared
-    
     /// Generate Managers
     private let variableManager = VariableManager()
     private let relevanceModelManager = RelevanceModelManager()
     private let thematicModelManager = ThematicModelManager()
+    private let context = PersistenceController.shared.container.viewContext
+    private let dataManager = DataManager.shared
     
-    /// Location monitoring for location changes
+    /// All POI Storage (temporarely) before the relevant ones get published in order to get displayed
+    private var allPOIs: [ArcGISFeature] = []
+    /// Relevant POIs that get overlayed onto the rest of the POIs
+    @Published var displayedPOIs: [ArcGISFeature] = []
+    /// Favorite POI Cache that are outside normal loading area
+    private var remoteFavoriteCache: [Int64: ArcGISFeature] = [:]
+    
+    /// Location monitoring variables for location changes
     private let locationManager = CLLocationManager()
     private var lastUpdateLocation: CLLocation?
-    private let significantDistanceThreshold: Double = 250.0 // meters
+    private let significantDistanceThreshold: Double = 250.0 /// meters
     
     /// Throttling for location updates
     private var lastLocationUpdateTime: Date = Date(timeIntervalSince1970: 0)
@@ -55,15 +62,22 @@ class ContentViewModel: NSObject, ObservableObject {
     private var aggregationTask: Task<Void, Never>?
     private var unfilteredRelevantPOIs: [ArcGISFeature] = [] /// Store POIs before aggregation
     /// Threshold for scale change to trigger re-aggregation
-    private let scaleChangeThreshold: Double = 0.2 /// 20% change
+    private let scaleChangeThreshold: Double = 0.25 /// 25% change
     
+    /// Exposed flag to display the loading sign in the view model
+    @Published var isComputingRelevance = false
+    
+    /// Expose search location state to the UI
+    @Published var isUsingSearchLocation = false
     /// Search Attributes
     let graphicsOverlay = GraphicsOverlay()
     let locator = LocatorTask(
         url: URL(string: "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer")!
     )
     
+    
     // MARK: - Initialization
+    
     
     /// Asynchronous Loading and calculation of the relevant of POIs
     override init() {
@@ -82,7 +96,7 @@ class ContentViewModel: NSObject, ObservableObject {
         
         setupLocationMonitoring()
         
-        // Listen for user changes
+        /// Listen for user changes
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleUserChange),
@@ -104,9 +118,11 @@ class ContentViewModel: NSObject, ObservableObject {
         }
     }
     
+    
     // MARK: - Relevance Predictions
     
-    /// Load Relevance Scores and Filter POIs
+    
+    /// Load Relevance Scores from Core Data and Filter the POIs which will be displayed later
     @MainActor
     func loadRelevanceScores() async {
             guard dataManager.currentUser() != nil else {
@@ -258,7 +274,9 @@ class ContentViewModel: NSObject, ObservableObject {
         }
     }
     
+    
     // MARK: - Thematic Predictions
+    
     
     /// Helper function to get theme name for logging
     private func getThemeName(_ theme: Double) -> String {
@@ -276,7 +294,7 @@ class ContentViewModel: NSObject, ObservableObject {
     
     /// Update theme and notify the UI
     private func updateTheme() async {
-        // Ensure we have environment data before predicting
+        /// Ensure that there is environment data available before predicting the theme
         let environment = await variableManager.getCachedEnvironment()
         
         let predictedTheme = thematicModelManager.predictTheme(
@@ -288,11 +306,11 @@ class ContentViewModel: NSObject, ObservableObject {
         print("Predicting theme ...")
         
         await MainActor.run {
-            // Save the newly predicted theme
+            /// Save the newly predicted theme
             dataManager.setPredictedTheme(theme: predictedTheme)
             dataManager.clearUserTheme()
             
-            // Notify SettingsManager of the change
+            /// Notify SettingsManager of the theme change
             NotificationCenter.default.post(
                 name: .themeDidChange,
                 object: nil,
@@ -325,12 +343,14 @@ class ContentViewModel: NSObject, ObservableObject {
         return themeMappings[themeKey] ?? []
     }
     
+    
     // MARK: - POI Handling
+    
     
     /// Async Initialization of the POIModel
     @MainActor
     private func initializePOIModel() async {
-        let model = await POIModel(variableManager: variableManager) // Initialize asynchronously
+        let model = await POIModel(variableManager: variableManager)
         await MainActor.run {
             self.poiModel = model
             self.allPOIs = model.POIs
@@ -340,16 +360,16 @@ class ContentViewModel: NSObject, ObservableObject {
     /// Load favorite POIs directly by their FIDs
     @MainActor
     func loadFavoritePOIsByFID() async {
-        // Get FIDs of all user favorites
+        /// Get FIDs of all user favorites
         let favoriteFIDs = dataManager.getUserFavoriteFIDs()
         guard !favoriteFIDs.isEmpty else { return }
         
-        // Check which favorites are already loaded
+        /// Check which favorites are already loaded
         var missingFIDs: [Int64] = []
         for fid in favoriteFIDs {
             var found = false
             
-            // Check if already in displayed POIs or all POIs
+            /// Check if already in displayed POIs or all POIs
             for poi in allPOIs {
                 if let poiFID = poi.attributes["fid"] as? NSNumber,
                    poiFID.int64Value == fid {
@@ -363,6 +383,7 @@ class ContentViewModel: NSObject, ObservableObject {
             }
         }
         
+        /// If all POIs are found -> end function
         if missingFIDs.isEmpty {
             print("All favorites already loaded")
             return
@@ -370,7 +391,7 @@ class ContentViewModel: NSObject, ObservableObject {
         
         print("Loading \(missingFIDs.count) remote favorites by FID...")
         
-        // Query the service for specific FIDs
+        /// Query the service for specific FIDs
         guard let poiModel = self.poiModel,
               let table = poiModel.featureTable else { return }
         
@@ -379,14 +400,14 @@ class ContentViewModel: NSObject, ObservableObject {
                 try await table.load()
             }
             
-            // Build WHERE clause for specific FIDs
+            /// Build a WHERE clause for the specific FIDs of the favorite POIs
             let fidList = missingFIDs.map { String($0) }.joined(separator: ",")
             let query = QueryParameters()
             query.whereClause = "fid IN (\(fidList))"
             
             let result = try await table.queryFeatures(using: query, queryFeatureFields: .loadAll)
             
-            // Cache the loaded favorites
+            /// Cache the loaded favorites
             for feature in result.features() {
                 if let arcFeature = feature as? ArcGISFeature,
                    let fidAny = arcFeature.attributes["fid"],
@@ -397,7 +418,7 @@ class ContentViewModel: NSObject, ObservableObject {
             
             print("Successfully loaded remote favorites")
             
-            // Notify favorites panel to refresh
+            /// Notify favorites panel to refresh the favorite POI locations
             NotificationCenter.default.post(name: .favoritesDidChange, object: nil)
             
         } catch {
@@ -415,7 +436,7 @@ class ContentViewModel: NSObject, ObservableObject {
             }
         }
         
-        // Check all loaded POIs
+        /// Check all loaded POIs
         for poi in allPOIs {
             if let poiFID = poi.attributes["fid"] as? NSNumber,
                poiFID.int64Value == fid {
@@ -423,7 +444,7 @@ class ContentViewModel: NSObject, ObservableObject {
             }
         }
         
-        // Check remote favorites cache
+        /// Check remote favorites cache (if not already loaded)
         if let cached = remoteFavoriteCache[fid] {
             return cached
         }
@@ -478,28 +499,30 @@ class ContentViewModel: NSObject, ObservableObject {
         }
     }
     
+    
     // MARK: - POI Aggregation
+    
     
     private func getAggregationThreshold(for scale: Double) -> Double {
         switch scale {
         case 0..<500:
-            return 3.0     // Very close: 3m
+            return 3.0     /// Very close: 3m
         case 500..<1500:
-            return 10.0    // Close: 10m
+            return 10.0    /// Close: 10m
         case 1500..<3000:
-            return 20.0    // Medium close: 20m
+            return 20.0    /// Medium close: 20m
         case 3000..<8000:
-            return 40.0    // Medium: 40m
+            return 40.0    /// Medium: 40m
         case 8000..<20000:
-            return 100.0    // Medium far: 80m
+            return 100.0    /// Medium far: 80m
         case 20000..<50000:
-            return 200.0   // Far: 150m
+            return 200.0   /// Far: 150m
         case 50000..<100000:
-            return 400.0   // Very far: 300m
+            return 400.0   /// Very far: 300m
         case 100000..<500000:
-            return 1000.0  // City level: 1km
+            return 1000.0  /// City level: 1km
         default:
-            return 2000.0  // Region level: 2km
+            return 2000.0  /// Region level: 2km
         }
     }
     
@@ -567,7 +590,7 @@ class ContentViewModel: NSObject, ObservableObject {
         /// Get current user theme and corresponding fclasses for boosting
         let currentTheme = variableManager.currentUserTheme()
         let themeClasses = getFclassesForTheme(currentTheme)
-        let themeBoost = 0.5 // Thematic Boost in percentage
+        let themeBoost = 0.5 /// Thematic Boost in percentage
         
         for poi in pois {
             guard let fidAny = poi.attributes["fid"],
@@ -609,7 +632,6 @@ class ContentViewModel: NSObject, ObservableObject {
                 }
             }
         }
-        
         return selectedPOIs
     }
     
@@ -628,7 +650,9 @@ class ContentViewModel: NSObject, ObservableObject {
         return isOnTheme ? baseScore + themeBoost : baseScore
     }
     
+    
     // MARK: - User Interactions
+    
     
     func markPOIAsFavorite(poi: ArcGISFeature) {
         if let fidAny = poi.attributes["fid"],
@@ -646,7 +670,9 @@ class ContentViewModel: NSObject, ObservableObject {
         }
     }
     
+    
     // MARK: - Location Monitoring
+    
     
     /// Setup location monitoring for significant movement detection
     private func setupLocationMonitoring() {
@@ -669,35 +695,34 @@ class ContentViewModel: NSObject, ObservableObject {
             return
         }
         
-        // Add throttling for ALL location changes
+        /// Add throttling for ALL location changes
         let now = Date()
         guard forceUpdate || now.timeIntervalSince(lastLocationUpdateTime) >= locationUpdateThrottle else {
             print("Location update throttled - only \(String(format: "%.1f", now.timeIntervalSince(lastLocationUpdateTime)))s since last update")
             return
         }
         
-        // Ensure all required components are initialized
+        /// Ensure all required components are initialized
         guard poiModel != nil else {
             print("POI model not initialized yet, skipping location update")
             return
         }
-        
         guard dataManager.currentUser() != nil else {
             print("No current user, skipping location update")
             return
         }
         
-        // Cancel any ongoing operations
+        /// Cancel any ongoing operations
         relevanceUpdateTask?.cancel()
         await relevanceUpdateTask?.value
         
-        // Invalidate cache when location changes
+        /// Invalidate cache when location changes
         variableManager.invalidateCache()
         
-        // Determine the location to use
+        /// Determine the location to use
         let locationPoint: Point
         if let searchPoint = newLocation {
-            // Validate search coordinates
+            /// Validate search coordinates
             guard abs(searchPoint.x) <= 180 && abs(searchPoint.y) <= 90 else {
                 print("Invalid search coordinates: \(searchPoint.x), \(searchPoint.y)")
                 return
@@ -714,10 +739,10 @@ class ContentViewModel: NSObject, ObservableObject {
             return
         }
         
-        // Update throttling timestamp
+        /// Update throttling timestamp
         lastLocationUpdateTime = now
         
-        // Check distance for user movement (not search)
+        /// Check distance for user movement (not search)
         if !isSearchTriggered, let currentCLLocation = clLocation {
             if let lastLocation = lastUpdateLocation {
                 let distance = currentCLLocation.distance(from: lastLocation)
@@ -730,27 +755,27 @@ class ContentViewModel: NSObject, ObservableObject {
             lastUpdateLocation = currentCLLocation
         }
         
-        // Update search location state before any operations
+        /// Update search location state before any operations
         if isSearchTriggered {
             self.isUsingSearchLocation = true
             currentSearchLocation = locationPoint
             variableManager.setSearchLocationOverride(locationPoint)
             print("Search triggered location change to: \(locationPoint.x), \(locationPoint.y)")
         } else if !isSearchTriggered {
-            // If this is a user location update, clear search override
+            /// If this is a user location update, clear search override
             self.isUsingSearchLocation = false
             currentSearchLocation = nil
             variableManager.setSearchLocationOverride(nil)
             print("User location change to: \(locationPoint.x), \(locationPoint.y)")
         }
         
-        // Add delay to ensure all systems are ready
+        /// Add delay to ensure all systems are ready
         try? await Task.sleep(nanoseconds: 500_000_000)
         
-        // Reload POIs for the new location
+        /// Reload POIs for the new location
         await reloadPOIsForLocation(locationPoint)
         
-        // Start relevance calculation
+        /// Start relevance calculation
         relevanceUpdateTask = Task {
             guard !Task.isCancelled else { return }
             let cacheSuccess = await variableManager.refreshCachedData()
@@ -773,7 +798,9 @@ class ContentViewModel: NSObject, ObservableObject {
         await relevanceUpdateTask?.value
     }
     
+    
     // MARK: - Location Change Public Interface Methods
+    
     
     /// Handle location change triggered by search
     @MainActor
@@ -784,7 +811,7 @@ class ContentViewModel: NSObject, ObservableObject {
         )
     }
     
-    /// Check if user has moved significantly and trigger updates
+    /// Check if user has moved significantly and trigger updates (Handle Location Change triggered by user location movement)
     @MainActor
     private func significantLocationChange(newLocation: CLLocation) async {
         await locationChange(
@@ -793,7 +820,7 @@ class ContentViewModel: NSObject, ObservableObject {
         )
     }
     
-    /// clear search state and return the user's current Point (no loading yet)
+    /// Clear search state and return the user's current Point (no loading yet)
     @MainActor
     func beginReturnToUserLocation() -> Point? {
         isUsingSearchLocation = false
@@ -805,11 +832,16 @@ class ContentViewModel: NSObject, ObservableObject {
     /// Change the location back to the user location and force update
     @MainActor
     func completeReturnToUserLocation(_ userLocation: Point) async {
-        await locationChange(newLocation: userLocation, forceUpdate: true)
+        await locationChange(
+            newLocation: userLocation,
+            forceUpdate: true
+        )
     }
 }
     
+
     // MARK: - CLLocationManagerDelegate Extension
+
 
 /// This is a CLLocationManagerDelegate extension that handles iOS location services callbacks. It's responsible for:
 /// - Receiving location updates from iOS when the user moves

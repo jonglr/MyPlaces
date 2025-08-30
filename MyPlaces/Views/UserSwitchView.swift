@@ -7,12 +7,22 @@
 
 /// **Class Functions**
 /// The UI View when the user wants to select another profile or delete a profile
+/// This file includes several sections and classes:
+/// - Avatar Colors: Keep the user profile colors consistant across views
+/// - User Switcher View: The main view that gets displayed when the user presses the SwitchUser button on the Panel Overlay which displays all the user profiles with information, avatar display and active status
+/// - User Profile Card: The view to select and delete certain user profiles (a modification to the User Switcher View)
+/// - Add User (Button): The button in the UserSwitchr Overview which can be pressed and redirects to the AddUser View
+/// - Add User View: The View when from the Switcher view, an additional user gets created
 
 import SwiftUI
 import CoreData
 import CryptoKit
 
-// Shared avatar color utilities (stable across launches)
+
+// MARK: - Avatar Colors
+
+
+/// Shared avatar color utilities (harmonized with the panel overlay when creating and displaying a user profile)
 private let avatarColorSets: [[Color]] = [
     [.pink, .red],
     [.orange, .red],
@@ -28,16 +38,23 @@ private func avatarColors(forID id: String) -> [Color] {
     return avatarColorSets[Int(number % UInt64(avatarColorSets.count))]
 }
 
+
+// MARK: - User Switcher View
+
+
 struct UserSwitcherView: View {
     @Environment(\.dismiss) var dismiss
+    /// Link to the Managers
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var dataManager: DataManager
     
+    /// Fetch user profiles
     @FetchRequest(
         entity: UserProfile.entity(),
         sortDescriptors: [NSSortDescriptor(keyPath: \UserProfile.name, ascending: true)]
     ) var users: FetchedResults<UserProfile>
     
+    /// Variable Declaration
     @State private var showingAddUserSheet = false
     @State private var showingDeleteConfirmation = false
     @State private var userToDelete: UserProfile?
@@ -46,21 +63,23 @@ struct UserSwitcherView: View {
     @State private var showingBulkDeleteConfirmation = false
     @State private var usersToDelete: Set<UserProfile> = []
     
+    /// View Body
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Header
+                    /// Header of the view on top
                     Text("Switch User")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .padding(.top)
                     
+                    /// Information text below the header
                     Text("Select a user profile or create a new one")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     
-                    // Edit mode info
+                    /// Edit mode information
                     if isEditMode {
                         HStack {
                             Image(systemName: "info.circle.fill")
@@ -76,7 +95,7 @@ struct UserSwitcherView: View {
                         .padding(.horizontal)
                     }
                     
-                    // Users Grid
+                    /// Users Grid that hold all the user profiles with the name and avatar pictures
                     LazyVGrid(columns: [
                         GridItem(.flexible()),
                         GridItem(.flexible()),
@@ -112,7 +131,7 @@ struct UserSwitcherView: View {
                             )
                         }
                         
-                        // Add User Button (only show when not in edit mode)
+                        /// Add User Button (only show when not in edit mode)
                         if !isEditMode {
                             AddUserCard {
                                 showingAddUserSheet = true
@@ -122,29 +141,29 @@ struct UserSwitcherView: View {
                     .padding(.horizontal)
                     .padding(.top, 20)
                     
-                    // Bulk delete button
+                    /// Bulk delete button for all the selected users
                     if isEditMode && !usersToDelete.isEmpty {
                         Button(action: {
                             showingBulkDeleteConfirmation = true
                         }) {
                             Label("Delete \(usersToDelete.count) User\(usersToDelete.count == 1 ? "" : "s")",
                                   systemImage: "trash")
-                                .foregroundColor(.white)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color.red)
-                                .cornerRadius(10)
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color.red)
+                            .cornerRadius(10)
                         }
                         .padding(.horizontal)
                     }
-                    
                     Spacer(minLength: 50)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    if users.count > 1 {  // Only show edit if there are multiple users
+                    /// Only show edit if there are multiple users to prevent the system reset to zero users
+                    if users.count > 1 {
                         Button(isEditMode ? "Cancel" : "Edit") {
                             withAnimation {
                                 isEditMode.toggle()
@@ -153,7 +172,6 @@ struct UserSwitcherView: View {
                         }
                     }
                 }
-                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
@@ -189,9 +207,10 @@ struct UserSwitcherView: View {
         }
     }
     
+    /// Functionality of the Edit View
     private func toggleUserSelection(_ user: UserProfile) {
         if user.isActive {
-            // Can't select active user for deletion
+            /// Can't select active user for deletion
             showingCannotDeleteAlert = true
             return
         }
@@ -203,18 +222,19 @@ struct UserSwitcherView: View {
         }
     }
     
+    /// Functionality to delete multiple users that are selected by the active user from the CoreData
     private func bulkDeleteUsers() {
         let context = PersistenceController.shared.container.viewContext
         
         for user in usersToDelete {
-            // Double-check not deleting active user
+            /// Double-check not deleting active user
             if !user.isActive {
-                // Delete associated relevance scores
+                /// Delete associated relevance scores
                 if let relevanceScores = user.relevanceScores as? Set<RelevanceScore> {
                     relevanceScores.forEach { context.delete($0) }
                 }
                 
-                // Delete user
+                /// Delete user
                 context.delete(user)
             }
         }
@@ -232,23 +252,7 @@ struct UserSwitcherView: View {
         }
     }
     
-    private func switchToUser(_ user: UserProfile) {
-        // Use the existing switchUser method from SettingsManager
-        settingsManager.user = settingsManager.switchUser(withID: user.userID!)
-        
-        // Post notification AFTER the user has been switched
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(name: .userDidChange, object: nil)
-        }
-        
-        // Dismiss the view
-        dismiss()
-        
-        // Show confirmation
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
-    }
-    
+    /// Functionality to delete a single user profile from Core Data
     private func deleteUser(_ user: UserProfile) {
         guard !user.isActive else {
             showingCannotDeleteAlert = true
@@ -257,29 +261,50 @@ struct UserSwitcherView: View {
         
         let context = PersistenceController.shared.container.viewContext
         
-        // Clear user-specific favorites and interactions
+        /// Clear user-specific favorites and interactions
         dataManager.clearUserFavorites(for: user)
         dataManager.clearUserInteractions(for: user)  // ADD THIS LINE
         
-        // Delete associated relevance scores
+        /// Delete associated relevance scores
         if let relevanceScores = user.relevanceScores as? Set<RelevanceScore> {
             relevanceScores.forEach { context.delete($0) }
         }
         
-        // Delete user
+        /// Delete user
         context.delete(user)
         
         do {
             try context.save()
             
-            // Haptic feedback
+            /// Haptic feedback
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
         } catch {
             print("Error deleting user: \(error)")
         }
     }
+    
+    /// When a user profile is tapped, the user gets switched to the tapped profile representation of that certain user
+    private func switchToUser(_ user: UserProfile) {
+        /// Use the existing switchUser method from SettingsManager
+        settingsManager.user = settingsManager.switchUser(withID: user.userID!)
+        
+        /// Post notification AFTER the user has been switched
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .userDidChange, object: nil)
+        }
+        /// Dismiss the view
+        dismiss()
+        
+        /// Show confirmation
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+    }
 }
+
+
+// MARK: - User Profile Overview
+
 
 struct UserProfileCard: View {
     let user: UserProfile
@@ -294,7 +319,7 @@ struct UserProfileCard: View {
     var body: some View {
         VStack(spacing: 8) {
             ZStack {
-                // Avatar circle
+                /// Avatar circle
                 Circle()
                     .fill(avatarGradient)
                     .frame(width: 70, height: 70)
@@ -304,7 +329,7 @@ struct UserProfileCard: View {
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundColor(.white)
                 
-                // Active indicator
+                /// Active indicator
                 if isActive && !isEditMode {
                     Circle()
                         .stroke(Color.green, lineWidth: 3)
@@ -317,7 +342,7 @@ struct UserProfileCard: View {
                         .offset(x: 25, y: -25)
                 }
                 
-                // Edit mode: show lock for active user
+                /// Edit mode: show lock for active user
                 if isEditMode && isActive {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 20))
@@ -326,7 +351,7 @@ struct UserProfileCard: View {
                         .offset(x: 25, y: -25)
                 }
                 
-                // Selection indicator in edit mode
+                /// Selection indicator in edit mode
                 if isEditMode && isSelected && !isActive {
                     Circle()
                         .stroke(Color.red, lineWidth: 3)
@@ -352,7 +377,7 @@ struct UserProfileCard: View {
         .opacity(isEditMode && isActive ? 0.6 : 1.0)
         .onTapGesture {
             if !isEditMode && isActive {
-                return // Don't do anything if tapping active user when not in edit mode
+                return /// Don't do anything if tapping active user when not in edit mode
             }
             
             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
@@ -370,8 +395,9 @@ struct UserProfileCard: View {
         }
     }
     
+    /// Create a gradient our of the predefined colors for safing the user profile (same as in Add User View)
     private var avatarGradient: LinearGradient {
-        // Prefer email, then name, then UUID to ensure stability across launches
+        /// Prefer email, then name, then UUID to ensure stability across launches
         let id = user.email ?? user.name ?? user.userID?.uuidString ?? "default"
         let colors = avatarColors(forID: id)
         return LinearGradient(
@@ -381,6 +407,10 @@ struct UserProfileCard: View {
         )
     }
 }
+
+
+// MARK: - Add User (Button)
+
 
 struct AddUserCard: View {
     let onTap: () -> Void
@@ -418,6 +448,11 @@ struct AddUserCard: View {
     }
 }
 
+
+// MARK: - Add User View
+
+
+/// The View when from the Switcher view, an additional user gets created
 struct AddUserView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var dataManager: DataManager
@@ -429,6 +464,7 @@ struct AddUserView: View {
     var body: some View {
         NavigationView {
             Form {
+                /// The section to enter the personal details needed to create a unique user Profile
                 Section {
                     HStack {
                         Text("Name")
@@ -448,12 +484,12 @@ struct AddUserView: View {
                 } header: {
                     Text("User Information")
                 }
-                
+                /// The section below the text fields to enter information and the preview of the user profile avatar
                 Section {
                     HStack {
                         Spacer()
                         
-                        // Preview of avatar
+                        /// Preview of avatar
                         VStack {
                             ZStack {
                                 Circle()
@@ -480,6 +516,8 @@ struct AddUserView: View {
             }
             .navigationTitle("New User")
             .navigationBarTitleDisplayMode(.inline)
+            
+            /// The toolbar on top to safe or cancel the creation of a new user
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -496,6 +534,7 @@ struct AddUserView: View {
                 }
             }
         }
+        /// When there is not all the information filled in when creating a new user -> alert raises
         .alert("Missing Information", isPresented: $showingEmptyFieldsAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -503,8 +542,9 @@ struct AddUserView: View {
         }
     }
     
+    /// Create a gradient our of the predefined colors for safing the user profile
     private var avatarGradient: LinearGradient {
-        // Use email when available for preview; falls back to name
+        /// Use email when available for preview; falls back to name
         let id = !email.isEmpty ? email : (!name.isEmpty ? name : "default")
         let colors = avatarColors(forID: id)
         return LinearGradient(
@@ -514,6 +554,7 @@ struct AddUserView: View {
         )
     }
     
+    /// Functionality of the user creation and integration into the App system
     private func createUser() {
         guard !name.isEmpty && !email.isEmpty else {
             showingEmptyFieldsAlert = true
@@ -522,13 +563,13 @@ struct AddUserView: View {
         
         let context = PersistenceController.shared.container.viewContext
         
-        // Deactivate all current users
+        /// Deactivate all current users
         let fetchRequest: NSFetchRequest<UserProfile> = UserProfile.fetchRequest()
         if let allUsers = try? context.fetch(fetchRequest) {
             allUsers.forEach { $0.isActive = false }
         }
         
-        // Create new user
+        /// Create new user
         let newUser = UserProfile(context: context)
         newUser.userID = UUID()
         newUser.name = name
@@ -538,10 +579,10 @@ struct AddUserView: View {
         do {
             try context.save()
             
-            // Post notification about user change
+            /// Post notification about user change
             NotificationCenter.default.post(name: .userDidChange, object: nil)
             
-            // Haptic feedback
+            /// Haptic feedback
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
             
@@ -552,7 +593,7 @@ struct AddUserView: View {
     }
 }
 
-// Notification extension
+/// Notification extension to notify the system that the user changed
 extension Notification.Name {
     static let userDidChange = Notification.Name("userDidChange")
 }

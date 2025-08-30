@@ -20,7 +20,7 @@ struct CustomPopupView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Custom header with favorite button
+            /// Custom header placeholderwith favorite button at the top of the Popup
             if let popup = popup,
                let feature = popup.geoElement as? ArcGISFeature {
                 customHeader(for: feature)
@@ -28,7 +28,7 @@ struct CustomPopupView: View {
                     .padding(.top)
             }
             
-            // Original PopupView
+            /// Original PopupView Content with the attribute information
             if let popup = popup {
                 PopupView(popup: popup, isPresented: $isPresented)
                     .padding(.horizontal)
@@ -39,16 +39,17 @@ struct CustomPopupView: View {
         }
     }
     
+    /// Declaration of the design of the custom header
     private func customHeader(for feature: ArcGISFeature) -> some View {
         HStack {
-            // POI Name
+            /// POI Name
             Text(feature.attributes["name"] as? String ?? "Unknown Place")
                 .font(.title.bold())
                 .foregroundColor(.primary)
             
             Spacer()
             
-            // Favorite button
+            /// Interactive favorite button
             Button(action: {
                 toggleFavorite(for: feature)
             }) {
@@ -61,6 +62,7 @@ struct CustomPopupView: View {
         .padding(.vertical, 8)
     }
     
+    /// Dynamic function to make the favorite button react to a tap
     private func toggleFavorite(for feature: ArcGISFeature) {
         guard let fidAny = feature.attributes["fid"],
               let fid = (fidAny as? NSNumber)?.int64Value else { return }
@@ -79,6 +81,7 @@ struct CustomPopupView: View {
         print("Toggled favorite for POI \(poiID) with FID \(fid): \(isFavorite)")
     }
     
+    /// Retrieve the status of a POI from the CoreData in order to adjust the favorite button accordingly
     private func loadFavoriteStatus() {
         guard let popup = popup,
               let feature = popup.geoElement as? ArcGISFeature,
@@ -88,7 +91,7 @@ struct CustomPopupView: View {
         let variableManager = VariableManager()
         let poiID = variableManager.uuidFromFID(fid)
         
-        // Check user-specific favorite status
+        /// Check user-specific favorite status
         isFavorite = DataManager.shared.isUserFavorite(poiID: poiID)
         
         print("Loaded favorite status for POI \(poiID): \(isFavorite)")

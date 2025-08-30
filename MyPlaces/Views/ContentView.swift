@@ -6,9 +6,15 @@
 //
 
 /// **Class Functions**
-/// Manages the primary MapView and its interactions (Pop-Ups and map Elements)
-/// Dynamically switches basemap themes (dark, light) based on user settings.
-/// Displays POIs with two layers: relevant (large, colored) and non-relevant (small, grey).
+/// Holds the main MapView and manages the user interactions with it (Pop-Ups and map Elements). Dynamically switches basemap themes (dark, light) based on user settings. Displays POIs with two layers: relevant (large, colored) and non-relevant (small, grey). Has Search Functionalities and User Switching and Favorite Location Storages.
+/// This file is separated into different functionality topics:
+/// - Variable Declaration
+/// - Initialization
+/// - Map View Body
+/// - Map Overlay Elements
+/// - Geocoding for Search
+/// - Create Custom FeatureCollectionLayer
+/// - Graphics for Search Results
 
 import SwiftUI
 import ArcGIS
@@ -18,9 +24,11 @@ import CoreLocation
 
 struct ContentView: View {
     
-    // MARK: - Initialization
     
-    /// Keep a reference to the ContentViewModel
+    // MARK: - Variable Declaration
+
+    
+    /// References to the ContentViewModel and the Managers
     @StateObject private var viewModel = ContentViewModel()
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var dataManager: DataManager
@@ -34,8 +42,6 @@ struct ContentView: View {
     /// Variables for the location display & related states
     @State private var locationDisplay = LocationDisplay(dataSource: SystemLocationDataSource())
     @State private var failedToStart = false
-    
-    @State private var layerUpdateTask: Task<Void, Never>?
     
     /// Variables for the pop-up logic
     @State private var identifyScreenPoint: CGPoint?
@@ -54,21 +60,29 @@ struct ContentView: View {
     /// Variables for POI aggregation
     @State private var currentViewpoint: Viewpoint?
     @State private var lastKnownScale: Double = 1500
-
     
+    @State private var layerUpdateTask: Task<Void, Never>?
+
     /// PopUp State Variables
     @State private var showFavoritesPanel = true
     @State private var favoritesPanelOffset: CGFloat = 0
     
+    
+    // MARK: - Initialization
+
+    
     init() {
+        /// Import the Basemap for Daytime
         let basemapItemDay = PortalItem(
             portal: .arcGISOnline(connection: .authenticated),
             id: Item.ID("56987f73d2b44570960d8a8f67bbe104")!
         )
+        /// Import the Basemap for Nighttime
         let basemapItemNight = PortalItem(
             portal: .arcGISOnline(connection: .authenticated),
             id: Item.ID("f2ac67c0a5564cdc90f29585354e6163")!
         )
+        /// Convert the two items into Baseaps
         let vtl_basemap_day = ArcGISVectorTiledLayer(item: basemapItemDay)
         let vtl_basemap_night = ArcGISVectorTiledLayer(item: basemapItemNight)
         let basemap_day = Basemap(baseLayers: [vtl_basemap_day])
@@ -76,6 +90,7 @@ struct ContentView: View {
         self.basemap_day = basemap_day
         self.basemap_night = basemap_night
         
+        /// Import the irrelevant POI (grey points)
         let initialMap = Map(basemap: basemap_day)
         let irrelevantPOIItem = PortalItem(
             portal: .arcGISOnline(connection: .authenticated),
@@ -84,6 +99,7 @@ struct ContentView: View {
         self.irrelevantPOIs = FeatureLayer(item: irrelevantPOIItem)
         initialMap.addOperationalLayer(irrelevantPOIs)
         
+        /// Assign the map state variable
         self._map = State(initialValue: initialMap)
 
     }
@@ -100,65 +116,11 @@ struct ContentView: View {
         case shopping
     }
     
-    // MARK: - Geocode Function
     
-    private func geocode(with searchText: String, proxy: MapViewProxy) async throws {
-        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            print("Empty search text")
-            return
-        }
-        
-        let parameters = GeocodeParameters()
-        parameters.addResultAttributeName("*")
-        parameters.maxResults = 1
-        parameters.outputSpatialReference = .wgs84
-        
-        do {
-            let geocodeResults = try await model.locator.geocode(forSearchText: searchText, using: parameters)
-            if let firstResult = geocodeResults.first,
-               let location = firstResult.displayLocation,
-               let symbol = model.textGraphic.symbol as? TextSymbol {
-                
-                let wgs84Location: Point
-                            if location.spatialReference == .wgs84 {
-                                wgs84Location = location
-                            } else {
-                                guard let projected = GeometryEngine.project(location, into: .wgs84) else {
-                                    print("Failed to project coordinates to WGS84")
-                                    return
-                                }
-                                wgs84Location = projected
-                            }
-                
-                model.markerGraphic.geometry = location
-                model.textGraphic.geometry = location
-                symbol.text = firstResult.label
-                
-                /// Recenter map to geocoded location
-                await proxy.setViewpointCenter(location, scale: 3000)
-                
-                // Trigger POI reload with validated WGS84 coordinates
-                await handleSearchLocationChange(searchLocation: wgs84Location)
-                
-                print("Search completed for: \(firstResult.label)")
-            } else {
-                print("No results found for search: \(searchText)")
-            }
-        } catch {
-            print("Geocode error for '\(searchText)': \(error.localizedDescription)")
-        }
-    }
+    // MARK: - Map View Body
     
-    /// Handle POI reload when map location changes through search
-    private func handleSearchLocationChange(searchLocation: Point) async {
-        print("Triggering POI reload for search location: \(searchLocation.x), \(searchLocation.y)")
-        
-        // Notify the view model about the new search location
-        await viewModel.searchLocationChange(newLocation: searchLocation)
-    }
     
-    // MARK: - View Body
-    
+    /// The Content View main structure
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -170,7 +132,7 @@ struct ContentView: View {
                         
                         /// UI overlays
                         VStack {
-                            searchAndToggleOverlayForBody(proxy: proxy)  // Pass proxy here
+                            searchAndTogglesOverlay(proxy: proxy)  // Pass proxy here
                             Spacer()
                             HStack {
                                 Spacer()
@@ -188,7 +150,7 @@ struct ContentView: View {
                         .ignoresSafeArea(.all, edges: .bottom)
                     }
                 }
-                /// Safe area blur overlay
+                /// Safe area blur overlay (on top of Screen)
                 VStack {
                     Rectangle()
                         .fill(.ultraThinMaterial)
@@ -198,10 +160,12 @@ struct ContentView: View {
                 }
             }
         }
+        /// Relevance Score loading overlay display
         .loadingOverlay(
             isPresented: $viewModel.isComputingRelevance,
             text: "Calculating relevance scores…"
         )
+        /// Popup Sheet
         .sheet(isPresented: $showPopupSheet) { [popup] in
             CustomPopupView(
                 popup: popup,
@@ -215,38 +179,39 @@ struct ContentView: View {
         }
     }
     
+    /// The Map Layer and it's logical components
     private var mapLayer: some View {
         MapViewReader { proxy in
-            // Break up the long modifier chain so the compiler can type-check faster
-            // by applying modifiers in stages to local variables.
+            /// Basemap Layer
             let baseMap = MapView(
                 map: map,
                 graphicsOverlays: [model.graphicsOverlay]
             )
+            /// Display current user location
             .locationDisplay(locationDisplay)
+            
+            /// Scale change observer for POI aggregation purposes
             .onViewpointChanged(kind: .centerAndScale) { newViewpoint in
-                // Update the viewpoint state
+                /// Update the viewpoint state
                 currentViewpoint = newViewpoint
-                
-                // Check if scale changed significantly
+                /// Check if scale changed significantly
                 let newScale = newViewpoint.targetScale
-                // Only update if scale changed by more than 10%
+                /// Only update if scale changed by more than 10%
                 let scaleChangeRatio = abs(newScale - lastKnownScale) / max(lastKnownScale, 1)
                 if scaleChangeRatio > 0.1 {
                     lastKnownScale = newScale
-                    
-                    // Trigger aggregation update
+                    /// Trigger aggregation update
                     Task {
                         await viewModel.handleMapScaleChange(newScale: newScale)
                     }
                 }
             }
             
-            /// Tap gesture
+            /// Identify and localize the tap gesture on the map layer
             let withTap = baseMap
                 .onSingleTapGesture { screenPoint, _ in
                     identifyScreenPoint = screenPoint
-                    // Auto-collapse favorites panel when interacting with map
+                    /// Auto-collapse favorites panel when interacting with map
                     withAnimation {
                         if showFavoritesPanel {
                             NotificationCenter.default.post(
@@ -257,7 +222,7 @@ struct ContentView: View {
                     }
                 }
             
-            /// Start location display
+            /// Start location display and set the initial variables for startup (zoom/pan/center)
             let withStartTask = withTap
                 .task {
                     let locationManager = CLLocationManager()
@@ -293,11 +258,11 @@ struct ContentView: View {
                     }
                 }
             
-            /// Alert on failure
+            /// Alert on failure of the layer identification
             let withAlert = withIdentifyTask
                 .alert("Location display failed to start", isPresented: $failedToStart) {}
             
-            /// Switch Day/Night mode
+            /// Switch Day/Night mode (with the toggle)
             let withDayNight = withAlert
                 .onChange(of: settingsManager.isNightMode) {
                     print("Switching to \(settingsManager.isNightMode ? "night" : "day") mode")
@@ -321,12 +286,13 @@ struct ContentView: View {
                     }
                 }
             
-            /// React to POI updates
+            /// React to POI updates and display them newly
             let withPOIReceive = withDayNight
                 .onReceive(viewModel.$displayedPOIs) { newPOIs in
                     layerUpdateTask?.cancel()
                     layerUpdateTask = Task {
-                        try? await Task.sleep(nanoseconds: 300_000_000) // debounce 0.3s
+                        /// debounce 0.3s
+                        try? await Task.sleep(nanoseconds: 300_000_000)
                         guard !Task.isCancelled else { return }
                         
                         let ids: [Int64] = newPOIs.compactMap {
@@ -368,7 +334,7 @@ struct ContentView: View {
                             await viewModel.ensurePOIVisible(feature)
                             await proxy.setViewpointCenter(geometry, scale: 800)
                             
-                            /// Simulate a tap on the location of the POI
+                            /// Simulate a tap on the location of the POI to make the popup show up
                             let screenPoint = proxy.screenPoint(fromLocation: geometry)
                             if let identifyResult = try? await proxy.identifyLayers(
                                 screenPoint: screenPoint ?? .init(x: 0, y: 0),
@@ -388,7 +354,7 @@ struct ContentView: View {
                     }
                 }
 
-            /// React to theme changes
+            /// React to theme changes of the theme picker
             let withThemeChange = withNavigateReceive
                 .onChange(of: settingsManager.theme) {
                     Task {
@@ -402,10 +368,15 @@ struct ContentView: View {
         }
     }
     
-    private func searchAndToggleOverlayForBody(proxy: MapViewProxy) -> some View {
+    
+    // MARK: - Map Overlay Elements
+    
+    
+    private func searchAndTogglesOverlay(proxy: MapViewProxy) -> some View {
         VStack(spacing: 12) {
-            // Pill-shaped search bar
+            /// Pill-shaped search bar
             HStack(spacing: 12) {
+                /// Search Icon
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
                     .font(.system(size: 16, weight: .medium))
@@ -417,19 +388,18 @@ struct ContentView: View {
                     Button("Search") {
                         Task {
                             try await geocode(with: searchText, proxy: proxy)
-                            searchText = "" // Clear search text after search
+                            searchText = "" /// Clear search text after search
                         }
                     }
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.blue)
                 }
-                
-                // Add the return to user location button
+                /// Add the return to user location button (blue arrow)
                 Button(action: {
                     Task { @MainActor in
-                        if let userPoint = viewModel.beginReturnToUserLocation() {    // clear override, get point
-                            await proxy.setViewpointCenter(userPoint, scale: 1500)     // zoom first
-                            await viewModel.completeReturnToUserLocation(userPoint)    // then load POIs/relevance
+                        if let userPoint = viewModel.beginReturnToUserLocation() {    /// clear override, get point
+                            await proxy.setViewpointCenter(userPoint, scale: 1500)     /// zoom first
+                            await viewModel.completeReturnToUserLocation(userPoint)    /// then load POIs/relevance
                         }
                     }
                 }) {
@@ -444,30 +414,31 @@ struct ContentView: View {
             .clipShape(Capsule())
             .shadow(color: .black.opacity(0.3), radius: 15, x: 0, y: 2)
             
+            /// Theme Picker Capsule to manually change the perdicted theme afterwards
             HStack {
                 Spacer()
+                /// Placeholder of the actual picker
                 themeSelectionPicker
                     .padding(8)
                     .background(.regularMaterial)
                     .clipShape(Capsule())
                     .shadow(color: .black.opacity(0.2), radius: 30, x: 0, y: 1)
                     .onAppear {
-                        // Load effective theme from Core Data
+                        /// Load effective theme from Core Data
                         let state = DataManager.shared.fetchThemeState()
                         let effective = state.userTheme ?? state.predictedTheme ?? "explore"
                         selectedTheme = ThemeCategory(rawValue: effective) ?? .explore
                         hasSyncedTheme = true
                     }
                     .onChange(of: settingsManager.theme) {
-                        // Keep picker in sync when theme changes externally (prediction or manual)
+                        /// Keep picker in sync with the settings manager when theme changes externally (prediction or manually through the user - pull)
                         if let category = ThemeCategory(rawValue: settingsManager.theme) {
                             selectedTheme = category
                         }
                     }
             }
             
-            
-            // Day/Night toggle below search
+            /// Day & Night toggle placeholder to switch the Basemaps (bright/dark)
             HStack {
                 Spacer()
                 dayNightToggle
@@ -477,9 +448,10 @@ struct ContentView: View {
         .padding(.horizontal, 20)
     }
     
+    /// Logics of the Basemap Day&Night Toggle Switch
     private var dayNightToggle: some View {
         ZStack {
-            // Background icons
+            /// Background icons
             HStack(spacing: 8) {
                 Image(systemName: "sun.max.fill")
                     .font(.system(size: 11, weight: .medium))
@@ -491,7 +463,7 @@ struct ContentView: View {
             }
             .padding(.horizontal, 12)
             
-            // Actual toggle
+            /// Actual toggle on top of the symbols
             Toggle("", isOn: $settingsManager.isNightMode)
                 .labelsHidden()
                 .offset(x: -1)
@@ -503,6 +475,7 @@ struct ContentView: View {
         .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 1)
     }
     
+    /// Logics of the Theme Picker Menue
     private var themeSelectionPicker: some View {
         Picker("Theme", selection: $selectedTheme) {
             ForEach(ThemeCategory.allCases, id: \.self) { theme in
@@ -510,6 +483,7 @@ struct ContentView: View {
             }
         }
         .pickerStyle(.menu)
+        /// Keep the settings manager in sync with the theme changes (push)
         .onChange(of: selectedTheme) {
             guard hasSyncedTheme else { return }
             guard settingsManager.theme != selectedTheme.rawValue else { return }
@@ -517,8 +491,75 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Build a FeatureCollectionLayer from filtered POIs
     
+    // MARK: - Geocoding for Search
+    
+    
+    /// Maps the entered search text entered in the searchbar to a geographic location
+    private func geocode(with searchText: String, proxy: MapViewProxy) async throws {
+        /// Make sure the entered text is not empty
+        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print("Empty search text")
+            return
+        }
+        
+        /// Set the geocode parameters
+        let parameters = GeocodeParameters()
+        parameters.addResultAttributeName("*")
+        parameters.maxResults = 1
+        parameters.outputSpatialReference = .wgs84
+        
+        do {
+            /// Fetch results from the geolocator model
+            let geocodeResults = try await model.locator.geocode(forSearchText: searchText, using: parameters)
+            if let firstResult = geocodeResults.first,
+               let location = firstResult.displayLocation,
+               let symbol = model.textGraphic.symbol as? TextSymbol {
+                
+                /// Project the WGS84 Locations to the search result
+                let wgs84Location: Point
+                            if location.spatialReference == .wgs84 {
+                                wgs84Location = location
+                            } else {
+                                guard let projected = GeometryEngine.project(location, into: .wgs84) else {
+                                    print("Failed to project coordinates to WGS84")
+                                    return
+                                }
+                                wgs84Location = projected
+                            }
+                
+                model.markerGraphic.geometry = location
+                model.textGraphic.geometry = location
+                symbol.text = firstResult.label
+                
+                /// Recenter map to geocoded location
+                await proxy.setViewpointCenter(location, scale: 3000)
+                
+                /// Trigger POI reload with validated WGS84 coordinates
+                await handleSearchLocationChange(searchLocation: wgs84Location)
+                
+                print("Search completed for: \(firstResult.label)")
+            } else {
+                print("No results found for search: \(searchText)")
+            }
+        } catch {
+            print("Geocode error for '\(searchText)': \(error.localizedDescription)")
+        }
+    }
+    
+    /// Handle POI reload when map location changes through search
+    private func handleSearchLocationChange(searchLocation: Point) async {
+        print("Triggering POI reload for search location: \(searchLocation.x), \(searchLocation.y)")
+        
+        /// Notify the ContentViewModel about the new search location
+        await viewModel.searchLocationChange(newLocation: searchLocation)
+    }
+    
+    
+    // MARK: - Create Custom FeatureCollectionLayer
+    
+    
+    /// Build a custom FeatureCollection Layer of the Relevant POIs in order to add it to the map view
     private func buildFeatureCollectionLayer(from features: [ArcGISFeature]) -> FeatureCollectionLayer {
         /// Create a new FeatureCollectionTable
         let collectionTable = FeatureCollectionTable(
@@ -526,13 +567,15 @@ struct ContentView: View {
             geometryType: Point.self,
             spatialReference: .wgs84
         )
+        /// Placeholder structure for the attribute values to fit in
         let desiredNames = makeFields().map { $0.name }
         
-        /// Add the [ArcGISFeature] to the collection table
+        /// Add the [ArcGISFeature] (relevant POIs) to the collection table
         Task {
             do {
                 for oldFeature in features {
                     var filteredAttributes = [String: Any]()
+                    /// Fill in the values in the prepared placeholder structure
                     for key in desiredNames {
                         if let value = oldFeature.attributes[key] {
                             filteredAttributes[key] = value
@@ -553,8 +596,6 @@ struct ContentView: View {
         return fcLayer
     }
     
-    // MARK: - Dynamically create fields from the first feature's attributes
-    
     /// Dynamically creates [Field] from the feature's attributes.
     private func makeFields() -> [Field] {
         return [
@@ -568,15 +609,20 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Graphics for Search
+
+// MARK: - Graphics for Search Results
+
 
 private class SearchModel: ObservableObject {
     
     let graphicsOverlay: GraphicsOverlay
     
+    /// ArcGIS World Geolocation Service
     let locator = LocatorTask(
         url: URL(string: "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer")!
     )
+    
+    /// Declaration of the appearance of the located Placename as the search result
     let textGraphic: Graphic = {
         let textSymbol = TextSymbol(
             text: "",
@@ -585,14 +631,13 @@ private class SearchModel: ObservableObject {
             horizontalAlignment: .center,
             verticalAlignment: .bottom
         )
-        
-        /// Outline around text instead of background block
         textSymbol.haloColor = .white
         textSymbol.haloWidth = 1
         
         return Graphic(symbol: textSymbol)
     }()
     
+    /// Declaration of the appearance of the located place as a graphic (circle)
     let markerGraphic: Graphic = {
         let markerSymbol = SimpleMarkerSymbol(
             style: .circle,
@@ -602,6 +647,7 @@ private class SearchModel: ObservableObject {
         return Graphic(symbol: markerSymbol)
     }()
     
+    /// Assign the specifications to the class variable for the MapView to retrieve when executing a search
     init() {
         graphicsOverlay = GraphicsOverlay(graphics: [textGraphic, markerGraphic])
     }
