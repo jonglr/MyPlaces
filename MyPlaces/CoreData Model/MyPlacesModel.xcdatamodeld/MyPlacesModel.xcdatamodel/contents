@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23788.4" systemVersion="24F74" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
     <entity name="POI" representedClassName="POI" syncable="YES">
+        <attribute name="fid" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="poiID" attributeType="UUID" usesScalarValueType="NO"/>
         <relationship name="relevance" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="RelevanceScore" inverseName="poi" inverseEntity="RelevanceScore"/>
     </entity>
     <entity name="RelevanceScore" representedClassName="RelevanceScore" syncable="YES">
         <attribute name="clickCount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="fid" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="isFavorite" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="lastClickedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="poiID" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>

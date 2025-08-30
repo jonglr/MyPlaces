@@ -15,7 +15,7 @@ import SwiftUI
 
 class SettingsManager: ObservableObject {
     @Published var isNightMode: Bool = false
-    @Published var user: UserProfile
+    @Published var user: UserProfile?
     @Published var theme: String = "explore"
     
     static let shared = DataManager(context: PersistenceController.shared.container.viewContext)
@@ -23,8 +23,7 @@ class SettingsManager: ObservableObject {
     
     init(context: NSManagedObjectContext) {
         self.context = context
-        let user = DataManager.shared.currentUser()!
-        self.user = user
+        self.user = nil
         
         // Load initial theme from CoreData
         let state = DataManager.shared.fetchThemeState()
@@ -41,6 +40,11 @@ class SettingsManager: ObservableObject {
     @objc private func handleThemeChange(_ notification: Notification) {
         guard let newTheme = notification.userInfo?["theme"] as? String else { return }
         DispatchQueue.main.async { self.theme = newTheme }
+    }
+    
+    /// Add the user as soon as it's created after first App start
+    func adopt(user: UserProfile) {
+        self.user = user
     }
     
     func switchTheme(to newTheme: String) {

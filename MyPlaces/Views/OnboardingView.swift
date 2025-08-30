@@ -15,6 +15,7 @@ struct OnboardingView: View {
     @State private var email: String = ""
 
     @EnvironmentObject var dataManager: DataManager
+    let onUserCreated: (UserProfile) -> Void
     
     var body: some View {
         VStack {
@@ -31,7 +32,15 @@ struct OnboardingView: View {
                 .padding()
 
             Button(action: {
-                dataManager.createUser(name: name, email: email)
+                dataManager.createUser(name: name, email: email){ result in
+                    switch result {
+                    case .success(let user):
+                        onUserCreated(user)      // hand user to the App layer
+                    case .failure(let err):
+                        // TODO: show alert/log
+                        print("User create failed:", err)
+                    }
+                }
             }) {
                 Text("Get Started")
                     .font(.headline)

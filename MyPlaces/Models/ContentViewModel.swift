@@ -20,6 +20,8 @@ class ContentViewModel: NSObject, ObservableObject {
     var poiModel: POIModel?
     /// stores all the POIs temporarely, before the relevant ones get published in order to get displayed
     private var allPOIs: [ArcGISFeature] = []
+    /// Cache for favorite POIs that are outside normal loading area
+    private var remoteFavoriteCache: [Int64: ArcGISFeature] = [:]
     /// The visualization of the relevant POIs that get overlayed onto the rest of the POIs
     @Published var displayedPOIs: [ArcGISFeature] = []
     /// Exposed flag to display the loading sign in the view model
@@ -185,6 +187,100 @@ class ContentViewModel: NSObject, ObservableObject {
         }
     }
     
+    /// Load favorite POIs directly by their FIDs
+        @MainActor
+    func loadFavoritePOIsByFID() async {
+        // Get FIDs of all user favorites
+        let favoriteFIDs = dataManager.getUserFavoriteFIDs()
+        guard !favoriteFIDs.isEmpty else { return }
+        
+        // Check which favorites are already loaded
+        var missingFIDs: [Int64] = []
+        for fid in favoriteFIDs {
+            var found = false
+            
+            // Check if already in displayed POIs or all POIs
+            for poi in allPOIs {
+                if let poiFID = poi.attributes["fid"] as? NSNumber,
+                   poiFID.int64Value == fid {
+                    found = true
+                    break
+                }
+            }
+            
+            if !found && remoteFavoriteCache[fid] == nil {
+                missingFIDs.append(fid)
+            }
+        }
+        
+        if missingFIDs.isEmpty {
+            print("All favorites already loaded")
+            return
+        }
+        
+        print("Loading \(missingFIDs.count) remote favorites by FID...")
+        
+        // Query the service for specific FIDs
+        guard let poiModel = self.poiModel,
+              let table = poiModel.featureTable else { return }
+        
+        do {
+            if table.loadStatus != .loaded {
+                try await table.load()
+            }
+            
+            // Build WHERE clause for specific FIDs
+            let fidList = missingFIDs.map { String($0) }.joined(separator: ",")
+            let query = QueryParameters()
+            query.whereClause = "fid IN (\(fidList))"
+            
+            let result = try await table.queryFeatures(using: query, queryFeatureFields: .loadAll)
+            
+            // Cache the loaded favorites
+            for feature in result.features() {
+                if let arcFeature = feature as? ArcGISFeature,
+                   let fidAny = arcFeature.attributes["fid"],
+                   let fid = (fidAny as? NSNumber)?.int64Value {
+                    remoteFavoriteCache[fid] = arcFeature
+                }
+            }
+            
+            print("Successfully loaded remote favorites")
+            
+            // Notify favorites panel to refresh
+            NotificationCenter.default.post(name: .favoritesDidChange, object: nil)
+            
+        } catch {
+            print("Error loading remote favorites: \(error)")
+        }
+    }
+    
+    /// Find POI by FID from any source
+    func findPOIByFID(_ fid: Int64) -> ArcGISFeature? {
+        // Check displayed POIs
+        for poi in displayedPOIs {
+            if let poiFID = poi.attributes["fid"] as? NSNumber,
+               poiFID.int64Value == fid {
+                return poi
+            }
+        }
+        
+        // Check all loaded POIs
+        for poi in allPOIs {
+            if let poiFID = poi.attributes["fid"] as? NSNumber,
+               poiFID.int64Value == fid {
+                return poi
+            }
+        }
+        
+        // Check remote favorites cache
+        if let cached = remoteFavoriteCache[fid] {
+            return cached
+        }
+        
+        return nil
+    }
+    
     /// Helper function to get theme name for logging
     private func getThemeName(_ theme: Double) -> String {
         let themeKey = String(Int(theme))
@@ -284,7 +380,7 @@ class ContentViewModel: NSObject, ObservableObject {
                 )
                 /// Simple main thread dispatch
                 await MainActor.run {
-                    dataManager.saveRelevanceScore(for: poiID, score: score)
+                    dataManager.saveRelevanceScore(for: poiID, score: score, fid: fid,)
                 }
             } else {
                 print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
@@ -304,7 +400,7 @@ class ContentViewModel: NSObject, ObservableObject {
             environmentType: environment  // Use the cached value
         )
         
-        print("Predicting theme with environment: \(environment)")
+        print("Predicting theme ...")
         
         await MainActor.run {
             // Save the newly predicted theme
@@ -327,7 +423,7 @@ class ContentViewModel: NSObject, ObservableObject {
         if let fidAny = poi.attributes["fid"],
            let fid = (fidAny as? NSNumber)?.int64Value {
             let poiID = variableManager.uuidFromFID(fid)
-            dataManager.updatePOIInteraction(poiID: poiID, context: context, isFavorite: true)
+            dataManager.updatePOIInteraction(poiID: poiID, context: context, isFavorite: true, fid: fid)
         }
     }
     
@@ -335,7 +431,7 @@ class ContentViewModel: NSObject, ObservableObject {
         if let fidAny = poi.attributes["fid"],
            let fid = (fidAny as? NSNumber)?.int64Value {
             let poiID = variableManager.uuidFromFID(fid)
-            dataManager.updatePOIInteraction(poiID: poiID, context: context)
+            dataManager.updatePOIInteraction(poiID: poiID, context: context, fid: fid)
         }
     }
     
@@ -613,7 +709,7 @@ class ContentViewModel: NSObject, ObservableObject {
                 displayedPOIs = updatedPOIs
                 
                 // Ensure it has a high relevance score so it shows up
-                dataManager.saveRelevanceScore(for: poiID, score: 0.9)
+                dataManager.saveRelevanceScore(for: poiID, score: 0.9, fid: fid )
             }
         }
     }

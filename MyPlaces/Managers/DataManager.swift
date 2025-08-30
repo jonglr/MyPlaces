@@ -38,13 +38,14 @@ class DataManager: ObservableObject {
         }
     }
     
-    /// Create a New User Profile
-    func createUser(name: String, email: String) {
+    /// Create a New User Profile while Onboarding View
+    func createUser(name: String, email: String, completion: @escaping (Result<UserProfile, Error>) -> Void) {
         let newUser = UserProfile(context: context)
         newUser.userID = UUID()
         newUser.name = name
         newUser.email = email
         newUser.isActive = true
+        completion(.success(newUser))
         saveContext()
     }
     
@@ -107,7 +108,7 @@ class DataManager: ObservableObject {
     // MARK: - Relevance Score Management
     
     /// Update the existing Relevance Scores, Favorite variable and click data for the user
-    func saveRelevanceScore(for poiID: UUID, score: Double) {
+    func saveRelevanceScore(for poiID: UUID, score: Double, fid: Int64) {
         guard let user = currentUser() else {
             print("No valid user found to save Relevance Score")
             return
@@ -130,6 +131,7 @@ class DataManager: ObservableObject {
                 // Create a new POI if it doesn't exist
                 poi = POI(context: context)
                 poi.poiID = poiID
+                poi.fid = fid
                 
                 try context.save()
             }
@@ -148,20 +150,20 @@ class DataManager: ObservableObject {
             if let existingScore = existingScores.first {
                 // Update existing score but PRESERVE all interaction data
                 existingScore.score = score
+                existingScore.fid = fid
                 // Don't change isFavorite, clickCount, or lastClickedDate - preserve them!
             } else {
                 let newScore = RelevanceScore(context: context)
                 newScore.userID = userID
                 newScore.poiID = poiID
+                newScore.fid = fid
                 newScore.score = score
-                // Initialize interaction fields for new scores
                 newScore.isFavorite = false
                 newScore.clickCount = 0
                 newScore.lastClickedDate = nil
                 newScore.user = user
                 newScore.poi = poi
             }
-            
             try context.save()
         } catch {
             print("Error saving relevance score: \(error.localizedDescription)")
@@ -192,7 +194,7 @@ class DataManager: ObservableObject {
     }
     
     /// Set favorite status for a POI for the current user
-    func setUserFavorite(poiID: UUID, isFavorite: Bool) {
+    func setUserFavorite(poiID: UUID, isFavorite: Bool, fid: Int64) {
         guard let user = currentUser(),
               let userID = user.userID else {
             print("No current user to set favorite")
@@ -201,6 +203,7 @@ class DataManager: ObservableObject {
         
         do {
             // First, ensure the POI exists
+            let fid = fid
             let poiFetch: NSFetchRequest<POI> = POI.fetchRequest()
             poiFetch.predicate = NSPredicate(format: "poiID == %@", poiID as CVarArg)
             poiFetch.fetchLimit = 1
@@ -231,9 +234,12 @@ class DataManager: ObservableObject {
                 relevanceScore = RelevanceScore(context: context)
                 relevanceScore.userID = userID
                 relevanceScore.poiID = poiID
+                relevanceScore.fid = fid
+                relevanceScore.score = 0.5  // Default neutral score
+                relevanceScore.clickCount = 0
+                relevanceScore.lastClickedDate = nil
                 relevanceScore.user = user
                 relevanceScore.poi = poi
-                relevanceScore.score = 0.5  // Default neutral score
             }
             
             // Set the user-specific favorite flag
@@ -256,13 +262,6 @@ class DataManager: ObservableObject {
         }
     }
     
-    /// Toggle favorite status for current user
-    func toggleUserFavorite(poiID: UUID) -> Bool {
-        let currentStatus = isUserFavorite(poiID: poiID)
-        setUserFavorite(poiID: poiID, isFavorite: !currentStatus)
-        return !currentStatus
-    }
-    
     /// Get all favorite POIs for current user
     func getUserFavorites() -> [RelevanceScore] {
         guard let user = currentUser() else { return [] }
@@ -278,6 +277,24 @@ class DataManager: ObservableObject {
             return try context.fetch(request)
         } catch {
             print("Error fetching user favorites: \(error)")
+            return []
+        }
+    }
+    
+    func getUserFavoriteFIDs() -> [Int64] {
+        guard let user = currentUser() else { return [] }
+        
+        let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
+        request.predicate = NSPredicate(
+            format: "user == %@ AND isFavorite == true",
+            user
+        )
+        
+        do {
+            let scores = try context.fetch(request)
+            return scores.compactMap { $0.fid > 0 ? $0.fid : nil }
+        } catch {
+            print("Error fetching favorite FIDs: \(error)")
             return []
         }
     }
@@ -315,7 +332,7 @@ class DataManager: ObservableObject {
     }
     
     /// Update POI interaction (modified to work with user favorites)
-    func updatePOIInteraction(poiID: UUID, context: NSManagedObjectContext, isFavorite: Bool? = nil) {
+    func updatePOIInteraction(poiID: UUID, context: NSManagedObjectContext, isFavorite: Bool? = nil, fid: Int64) {
         guard let user = currentUser(),
               let userID = user.userID else {
             print("No current user to update interaction")
@@ -354,10 +371,12 @@ class DataManager: ObservableObject {
                 relevanceScore = RelevanceScore(context: context)
                 relevanceScore.userID = userID
                 relevanceScore.poiID = poiID
+                relevanceScore.fid = fid
+                relevanceScore.score = 0.5  // Default neutral score
+                relevanceScore.clickCount = 0
+                relevanceScore.lastClickedDate = nil
                 relevanceScore.user = user
                 relevanceScore.poi = poi
-                relevanceScore.score = 0.5  // Default neutral score
-                relevanceScore.clickCount = 0  // Initialize click count
             }
             
             // Update user-specific interaction data

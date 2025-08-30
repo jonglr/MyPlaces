@@ -17,6 +17,7 @@ extension RelevanceScore {
     }
 
     @NSManaged public var poiID: UUID?
+    @NSManaged public var fid: Int64
     @NSManaged public var score: Double
     @NSManaged public var userID: UUID?
     @NSManaged public var isFavorite: Bool

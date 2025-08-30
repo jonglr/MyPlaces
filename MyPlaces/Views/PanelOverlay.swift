@@ -94,7 +94,7 @@ struct FavoritesPanel: View {
                 loadFavorites()
             }
         }
-        .onChange(of: settingsManager.user.userID) {
+        .onChange(of: settingsManager.user?.userID) {
             print("User ID changed in settings")
             // Clear and reload when user changes
             favoritePOIs = []
@@ -126,8 +126,8 @@ struct FavoritesPanel: View {
     private var profileButton: some View {
         Menu {
             Section {
-                Label(settingsManager.user.name ?? "User", systemImage: "person.fill")
-                Label(settingsManager.user.email ?? "", systemImage: "envelope.fill")
+                Label(settingsManager.user?.name ?? "User", systemImage: "person.fill")
+                Label(settingsManager.user?.email ?? "", systemImage: "envelope.fill")
             }
             
             Divider()
@@ -149,7 +149,7 @@ struct FavoritesPanel: View {
                     .fill(avatarGradient)
                     .frame(width: 40, height: 40)
                 
-                Text(settingsManager.user.name?.prefix(1).uppercased() ?? "U")
+                Text(settingsManager.user?.name?.prefix(1).uppercased() ?? "U")
                     .font(.headline)
                     .foregroundColor(.white)
             }
@@ -162,7 +162,7 @@ struct FavoritesPanel: View {
     }
                         
     private var avatarGradient: LinearGradient {
-        let name = settingsManager.user.name ?? ""
+        let name = settingsManager.user?.name ?? ""
         let hash = abs(name.hashValue)
         let colorSets: [[Color]] = [
             [.blue, .cyan],
@@ -315,28 +315,49 @@ struct FavoritesPanel: View {
     }
     
     private func loadFavorites() {
-        // Get current user's favorites using the proper user-specific method
+        // Get current user's favorites with FIDs
         let userFavoriteScores = dataManager.getUserFavorites()
-        print("Found \(userFavoriteScores.count) favorites for current user")
+        print("Found \(userFavoriteScores.count) favorite scores for current user")
         
-        var favorites: [FavoritePOI] = []
-        for score in userFavoriteScores {
-            if let poiID = score.poiID,
-               let feature = findFeatureForPOI(poiID: poiID) {
-                let name = feature.attributes["name"] as? String ?? "Unknown"
-                let fclass = feature.attributes["fclass"] as? String ?? ""
+        // First, ensure remote favorites are loaded
+        Task {
+            await viewModel.loadFavoritePOIsByFID()
+            
+            await MainActor.run {
+                // Now build the favorites list
+                var favorites: [FavoritePOI] = []
                 
-                favorites.append(FavoritePOI(
-                    poiID: poiID,
-                    name: name,
-                    fclass: fclass,
-                    feature: feature
-                ))
+                for score in userFavoriteScores {
+                    guard let poiID = score.poiID else { continue }
+                    
+                    // Try to find by FID first (more reliable)
+                    let feature: ArcGISFeature?
+                    if score.fid > 0 {
+                        feature = viewModel.findPOIByFID(score.fid)
+                    } else {
+                        // Fallback to UUID search for old data
+                        feature = findFeatureForPOI(poiID: poiID)
+                    }
+                    
+                    if let feature = feature {
+                        let name = feature.attributes["name"] as? String ?? "Unknown"
+                        let fclass = feature.attributes["fclass"] as? String ?? ""
+                        
+                        favorites.append(FavoritePOI(
+                            poiID: poiID,
+                            name: name,
+                            fclass: fclass,
+                            feature: feature
+                        ))
+                    } else {
+                        print("Could not find favorite with FID \(score.fid) or UUID \(poiID)")
+                    }
+                }
+                
+                self.favoritePOIs = favorites.sorted { $0.name < $1.name }
+                print("Displayed \(favoritePOIs.count) of \(userFavoriteScores.count) favorites")
             }
         }
-        
-        print("Successfully loaded \(favorites.count) favorites with features")
-        favoritePOIs = favorites.sorted { $0.name < $1.name }  // Sort alphabetically
     }
     
     private func findFeatureForPOI(poiID: UUID) -> ArcGISFeature? {

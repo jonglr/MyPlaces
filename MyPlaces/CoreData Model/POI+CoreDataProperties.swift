@@ -17,6 +17,7 @@ extension POI {
     }
 
     @NSManaged public var poiID: UUID?
+    @NSManaged public var fid: Int64
     @NSManaged public var relevance: NSSet?
 
 }

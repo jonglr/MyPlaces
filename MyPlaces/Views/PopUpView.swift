@@ -68,15 +68,15 @@ struct CustomPopupView: View {
         let variableManager = VariableManager()
         let poiID = variableManager.uuidFromFID(fid)
         
-        // Toggle using the proper user-specific method
-        let newState = DataManager.shared.toggleUserFavorite(poiID: poiID)
-        isFavorite = newState
+        // Toggle using the proper user-specific method WITH FID
+        DataManager.shared.setUserFavorite(poiID: poiID, isFavorite: !isFavorite, fid: fid)
+        isFavorite = !isFavorite  // Update local state
         
         // Trigger haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
         
-        print("Toggled favorite for POI \(poiID): \(newState)")
+        print("Toggled favorite for POI \(poiID) with FID \(fid): \(isFavorite)")
     }
     
     private func loadFavoriteStatus() {

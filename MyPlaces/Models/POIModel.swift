@@ -15,7 +15,7 @@ import SwiftUI
 class POIModel {
     
     /// The feature table to query
-    private var featureTable: ServiceFeatureTable?
+    var featureTable: ServiceFeatureTable?
     private let variableManager: VariableManager
     /// Loaded POIs (ArcGISFeaturef Array)
     var POIs: [ArcGISFeature] = []
