@@ -16,9 +16,6 @@ extension POI {
         return NSFetchRequest<POI>(entityName: "POI")
     }
 
-    @NSManaged public var clickCount: Int32
-    @NSManaged public var favorite: Bool
-    @NSManaged public var lastClickedDate: Date?
     @NSManaged public var poiID: UUID?
     @NSManaged public var relevance: NSSet?
 

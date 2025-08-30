@@ -20,6 +20,8 @@ extension RelevanceScore {
     @NSManaged public var score: Double
     @NSManaged public var userID: UUID?
     @NSManaged public var isFavorite: Bool
+    @NSManaged public var clickCount: Int32
+    @NSManaged public var lastClickedDate: Date?
     @NSManaged public var poi: POI?
     @NSManaged public var user: UserProfile?
 

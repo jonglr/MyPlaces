@@ -239,6 +239,10 @@ struct UserSwitcherView: View {
         
         let context = PersistenceController.shared.container.viewContext
         
+        // Clear user-specific favorites and interactions
+        dataManager.clearUserFavorites(for: user)
+        dataManager.clearUserInteractions(for: user)  // ADD THIS LINE
+        
         // Delete associated relevance scores
         if let relevanceScores = user.relevanceScores as? Set<RelevanceScore> {
             relevanceScores.forEach { context.delete($0) }

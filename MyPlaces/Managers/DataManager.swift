@@ -106,7 +106,7 @@ class DataManager: ObservableObject {
     
     // MARK: - Relevance Score Management
     
-    /// Update the existing saveRelevanceScore to preserve favorite status
+    /// Update the existing Relevance Scores, Favorite variable and click data for the user
     func saveRelevanceScore(for poiID: UUID, score: Double) {
         guard let user = currentUser() else {
             print("No valid user found to save Relevance Score")
@@ -126,14 +126,10 @@ class DataManager: ObservableObject {
             
             if let existingPOI = try context.fetch(poiFetch).first {
                 poi = existingPOI
-                // DON'T reset favorite status for existing POIs
             } else {
                 // Create a new POI if it doesn't exist
                 poi = POI(context: context)
                 poi.poiID = poiID
-                poi.favorite = false
-                poi.clickCount = 0
-                poi.lastClickedDate = nil
                 
                 try context.save()
             }
@@ -150,15 +146,18 @@ class DataManager: ObservableObject {
             let existingScores = try context.fetch(fetchRequest)
             
             if let existingScore = existingScores.first {
-                // Update existing score but PRESERVE favorite status
+                // Update existing score but PRESERVE all interaction data
                 existingScore.score = score
-                // Don't change existingScore.isFavorite - preserve it!
+                // Don't change isFavorite, clickCount, or lastClickedDate - preserve them!
             } else {
                 let newScore = RelevanceScore(context: context)
                 newScore.userID = userID
                 newScore.poiID = poiID
                 newScore.score = score
-                newScore.isFavorite = false  // New scores default to not favorite
+                // Initialize interaction fields for new scores
+                newScore.isFavorite = false
+                newScore.clickCount = 0
+                newScore.lastClickedDate = nil
                 newScore.user = user
                 newScore.poi = poi
             }
@@ -213,9 +212,6 @@ class DataManager: ObservableObject {
                 // Create POI if it doesn't exist
                 poi = POI(context: context)
                 poi.poiID = poiID
-                poi.clickCount = 0
-                poi.lastClickedDate = nil
-                poi.favorite = false  // Global favorite stays false
             }
             
             // Now handle the user-specific favorite through RelevanceScore
@@ -320,42 +316,115 @@ class DataManager: ObservableObject {
     
     /// Update POI interaction (modified to work with user favorites)
     func updatePOIInteraction(poiID: UUID, context: NSManagedObjectContext, isFavorite: Bool? = nil) {
-        guard let poi = fetchPOI(poiID: poiID, context: context) else {
-            // If POI doesn't exist, create it
-            let newPOI = POI(context: context)
-            newPOI.poiID = poiID
-            newPOI.clickCount = 1
-            newPOI.lastClickedDate = Date()
-            newPOI.favorite = false
-            
-            saveContext()
-            
-            // Handle favorite if specified
-            if let isFavorite = isFavorite {
-                setUserFavorite(poiID: poiID, isFavorite: isFavorite)
-            }
+        guard let user = currentUser(),
+              let userID = user.userID else {
+            print("No current user to update interaction")
             return
         }
         
-        // Update click count and last clicked date
-        poi.clickCount += 1
-        poi.lastClickedDate = Date()
-        
-        // Handle favorite status through user-specific method
-        if let isFavorite = isFavorite {
-            setUserFavorite(poiID: poiID, isFavorite: isFavorite)
+        do {
+            // Ensure POI exists
+            let poiFetch: NSFetchRequest<POI> = POI.fetchRequest()
+            poiFetch.predicate = NSPredicate(format: "poiID == %@", poiID as CVarArg)
+            poiFetch.fetchLimit = 1
+            
+            let poi: POI
+            if let existingPOI = try context.fetch(poiFetch).first {
+                poi = existingPOI
+            } else {
+                // Create POI if it doesn't exist
+                poi = POI(context: context)
+                poi.poiID = poiID
+            }
+            
+            // Get or create RelevanceScore for this user-POI pair
+            let scoreFetch: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
+            scoreFetch.predicate = NSPredicate(
+                format: "user == %@ AND poiID == %@",
+                user,
+                poiID as CVarArg
+            )
+            scoreFetch.fetchLimit = 1
+            
+            let relevanceScore: RelevanceScore
+            if let existingScore = try context.fetch(scoreFetch).first {
+                relevanceScore = existingScore
+            } else {
+                // Create new RelevanceScore if it doesn't exist
+                relevanceScore = RelevanceScore(context: context)
+                relevanceScore.userID = userID
+                relevanceScore.poiID = poiID
+                relevanceScore.user = user
+                relevanceScore.poi = poi
+                relevanceScore.score = 0.5  // Default neutral score
+                relevanceScore.clickCount = 0  // Initialize click count
+            }
+            
+            // Update user-specific interaction data
+            relevanceScore.clickCount += 1
+            relevanceScore.lastClickedDate = Date()
+            
+            // Handle favorite if specified
+            if let isFavorite = isFavorite {
+                relevanceScore.isFavorite = isFavorite
+                if isFavorite && relevanceScore.score < 0.8 {
+                    relevanceScore.score = 0.8  // Boost score for favorites
+                }
+            }
+            
+            try context.save()
+            print("Updated interaction for user \(user.name ?? "Unknown"): POI \(poiID), clicks: \(relevanceScore.clickCount)")
+            
+        } catch {
+            print("Error updating POI interaction: \(error)")
+            context.rollback()
         }
-        
-        saveContext()
     }
     
     func getPOIInteraction(poiID: UUID, context: NSManagedObjectContext) -> (isFavorite: Bool, clickCount: Int32, lastClickedDate: Date) {
-        guard let poi = fetchPOI(poiID: poiID, context: context) else {
-            /// If POI not found to retrieve interactions
-            return (false, 0, Calendar.current.date(byAdding: .day, value: -600, to: Date()) ?? Date())
+        guard let user = currentUser() else {
+            print("No current user to get interaction")
+            return (false, 0, Date.distantPast)
         }
-        let fallbackDate = Calendar.current.date(byAdding: .day, value: -600, to: Date()) ?? Date()
-        return (poi.favorite, poi.clickCount, poi.lastClickedDate ?? fallbackDate)
+        
+        let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
+        request.predicate = NSPredicate(
+            format: "user == %@ AND poiID == %@",
+            user,
+            poiID as CVarArg
+        )
+        request.fetchLimit = 1
+        
+        do {
+            if let relevanceScore = try context.fetch(request).first {
+                let lastClicked = relevanceScore.lastClickedDate ?? Date.distantPast
+                return (relevanceScore.isFavorite, relevanceScore.clickCount, lastClicked)
+            }
+        } catch {
+            print("Error fetching POI interaction: \(error)")
+        }
+        
+        // Return defaults if no interaction found
+        return (false, 0, Date.distantPast)
+    }
+    
+    /// Clear all interactions for a user (useful when deleting user)
+    func clearUserInteractions(for user: UserProfile) {
+        let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
+        request.predicate = NSPredicate(format: "user == %@", user)
+        
+        do {
+            let scores = try context.fetch(request)
+            for score in scores {
+                // Reset interaction data
+                score.clickCount = 0
+                score.lastClickedDate = nil
+                score.isFavorite = false
+            }
+            try context.save()
+        } catch {
+            print("Error clearing user interactions: \(error)")
+        }
     }
     
     
