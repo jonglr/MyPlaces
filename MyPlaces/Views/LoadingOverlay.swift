@@ -4,6 +4,10 @@
 //
 //  Created by Jon Guler on 26.08.2025.
 //
+
+/// **Class Functions**
+/// Shows up on top of the UI to show the user, that the App is loading the Relevance Scores and prevent any user Interaction
+
 import SwiftUI
 
 struct LoadingOverlay: View {
@@ -40,7 +44,7 @@ struct LoadingOverlayModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .disabled(isPresented) // prevent interaction
+            .disabled(isPresented) /// prevent interaction
             .overlay(
                 Group {
                     if isPresented {

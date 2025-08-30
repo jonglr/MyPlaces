@@ -10,6 +10,23 @@
 
 import SwiftUI
 import CoreData
+import CryptoKit
+
+// Shared avatar color utilities (stable across launches)
+private let avatarColorSets: [[Color]] = [
+    [.pink, .red],
+    [.orange, .red],
+    [.yellow, .orange],
+    [.cyan, .blue]
+]
+
+private func avatarColors(forID id: String) -> [Color] {
+    let digest = SHA256.hash(data: Data(id.utf8))
+    let number = digest.withUnsafeBytes { ptr in
+        ptr.load(as: UInt64.self) // take first 8 bytes as number
+    }
+    return avatarColorSets[Int(number % UInt64(avatarColorSets.count))]
+}
 
 struct UserSwitcherView: View {
     @Environment(\.dismiss) var dismiss
@@ -354,27 +371,14 @@ struct UserProfileCard: View {
     }
     
     private var avatarGradient: LinearGradient {
-        let colors = avatarColors(for: user.name ?? "")
+        // Prefer email, then name, then UUID to ensure stability across launches
+        let id = user.email ?? user.name ?? user.userID?.uuidString ?? "default"
+        let colors = avatarColors(forID: id)
         return LinearGradient(
             colors: colors,
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
-    }
-    
-    private func avatarColors(for name: String) -> [Color] {
-        let hash = abs(name.hashValue)
-        let colorSets: [[Color]] = [
-            [.blue, .cyan],
-            [.purple, .pink],
-            [.orange, .red],
-            [.green, .mint],
-            [.indigo, .purple],
-            [.pink, .orange],
-            [.teal, .blue],
-            [.yellow, .orange]
-        ]
-        return colorSets[hash % colorSets.count]
     }
 }
 
@@ -500,29 +504,14 @@ struct AddUserView: View {
     }
     
     private var avatarGradient: LinearGradient {
-        let colors = avatarColors(for: name)
+        // Use email when available for preview; falls back to name
+        let id = !email.isEmpty ? email : (!name.isEmpty ? name : "default")
+        let colors = avatarColors(forID: id)
         return LinearGradient(
             colors: colors,
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
-    }
-    
-    private func avatarColors(for name: String) -> [Color] {
-        guard !name.isEmpty else { return [.gray, .gray.opacity(0.7)] }
-        
-        let hash = abs(name.hashValue)
-        let colorSets: [[Color]] = [
-            [.blue, .cyan],
-            [.purple, .pink],
-            [.orange, .red],
-            [.green, .mint],
-            [.indigo, .purple],
-            [.pink, .orange],
-            [.teal, .blue],
-            [.yellow, .orange]
-        ]
-        return colorSets[hash % colorSets.count]
     }
     
     private func createUser() {

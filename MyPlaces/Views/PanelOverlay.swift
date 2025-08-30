@@ -12,6 +12,7 @@
 import SwiftUI
 import CoreData
 import ArcGIS
+import CryptoKit
 
 struct FavoritesPanel: View {
     @EnvironmentObject var settingsManager: SettingsManager
@@ -160,21 +161,21 @@ struct FavoritesPanel: View {
                 .environmentObject(dataManager)
         }
     }
-                        
+    
     private var avatarGradient: LinearGradient {
-        let name = settingsManager.user?.name ?? ""
-        let hash = abs(name.hashValue)
+        let id = settingsManager.user?.email ?? settingsManager.user?.name ?? "default"
+        let digest = SHA256.hash(data: Data(id.utf8))
+        let number = digest.withUnsafeBytes { ptr in
+            return ptr.load(as: UInt64.self) /// take first 8 bytes as number
+        }
         let colorSets: [[Color]] = [
-            [.blue, .cyan],
-            [.purple, .pink],
+            [.pink, .red],
             [.orange, .red],
-            [.green, .mint],
-            [.indigo, .purple],
-            [.pink, .orange],
-            [.teal, .blue],
-            [.yellow, .orange]
+            [.yellow, .orange],
+            [.cyan, .blue]
         ]
-        let colors = colorSets[hash % colorSets.count]
+        let colors = colorSets[Int(number % UInt64(colorSets.count))]
+        
         return LinearGradient(
             colors: colors,
             startPoint: .topLeading,
@@ -236,26 +237,20 @@ struct FavoritesPanel: View {
                 HStack {
                     Image(systemName: iconForFclass(favorite.fclass))
                         .font(.system(size: 16))
-                        .foregroundColor(.white)
+                        .foregroundColor(.blue)
                     Spacer()
                 }
                 
                 Text(favorite.name)
                     .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
             }
             .padding(12)
             .frame(width: 100, height: 70)
-            .background(
-                LinearGradient(
-                    colors: [Color.blue, Color.blue.opacity(0.8)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+            .background(Color.gray.opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
@@ -288,7 +283,7 @@ struct FavoritesPanel: View {
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 16)
-            .background(Color.gray.opacity(0.1))
+            .background(Color.gray.opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }

@@ -54,7 +54,7 @@ class RelevanceModelManager {
             return output.interestScore
         } catch {
             print("Error predicting relevance: \(error.localizedDescription)")
-            return 0.0 // Return a safe default value (0.0) for relevance
+            return 0.0 /// Return a safe default value (0.0) for relevance
         }
     }
 }

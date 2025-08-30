@@ -23,30 +23,29 @@ class DataManager: ObservableObject {
     
     // MARK: - User Profile Management
     
-    /// Fetch the Current User Profile
-    func currentUser() -> UserProfile? {
-        let request: NSFetchRequest<UserProfile> = UserProfile.fetchRequest()
-        request.predicate = NSPredicate(format: "isActive == true")
-        request.fetchLimit = 1
-        
-        do {
-            let user = try context.fetch(request).first
-            return user
-        } catch {
-            print("Error fetching active user profile: \(error.localizedDescription)")
-            return nil
-        }
-    }
-    
     /// Create a New User Profile while Onboarding View
     func createUser(name: String, email: String, completion: @escaping (Result<UserProfile, Error>) -> Void) {
+        // First deactivate any existing users (though there shouldn't be any)
+        let fetchRequest: NSFetchRequest<UserProfile> = UserProfile.fetchRequest()
+        if let existingUsers = try? context.fetch(fetchRequest) {
+            existingUsers.forEach { $0.isActive = false }
+        }
+        
+        /// Create the new user
         let newUser = UserProfile(context: context)
         newUser.userID = UUID()
         newUser.name = name
         newUser.email = email
         newUser.isActive = true
-        completion(.success(newUser))
-        saveContext()
+        
+        /// Save the context first
+        do {
+            try context.save()
+            /// Now the user is properly saved and can be fetched by currentUser()
+            completion(.success(newUser))
+        } catch {
+            completion(.failure(error))
+        }
     }
     
     /// Checks if there is a user in the database
@@ -63,19 +62,41 @@ class DataManager: ObservableObject {
         }
     }
     
+    /// Fetch the Current User Profile
+    func currentUser() -> UserProfile? {
+        let request: NSFetchRequest<UserProfile> = UserProfile.fetchRequest()
+        request.predicate = NSPredicate(format: "isActive == true")
+        request.fetchLimit = 1
+        
+        do {
+            let user = try context.fetch(request).first
+            return user
+        } catch {
+            print("Error fetching active user profile: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    // MARK: - Theme Management
+    
+    struct ThemeState {
+        let userTheme: String?
+        let predictedTheme: String?
+    }
+    
+    /// Return the two theme attributes
+    func fetchThemeState() -> ThemeState {
+        let user = currentUser()
+        return ThemeState(
+            userTheme: user?.userTheme,
+            predictedTheme: user?.predictedTheme
+        )
+    }
+    
     /// Save Theme which was set by the User
     func setUserTheme(theme: String) {
         guard let user = currentUser() else { print("No valid user found.") ; return }
         user.userTheme = theme
-        do {
-            try context.save()
-        } catch { print("Error saving theme: \(error.localizedDescription)") }
-    }
-    
-    /// Save Theme which was predicted for the User
-    func setPredictedTheme(theme: String) {
-        guard let user = currentUser() else { print("No valid user found.") ; return }
-        user.predictedTheme = theme
         do {
             try context.save()
         } catch { print("Error saving theme: \(error.localizedDescription)") }
@@ -89,19 +110,14 @@ class DataManager: ObservableObject {
             try context.save()
         } catch { print("Error saving theme: \(error.localizedDescription)") }
     }
-        
-    struct ThemeState {
-        let userTheme: String?
-        let predictedTheme: String?
-    }
-
-    /// Return the two theme attributes
-    func fetchThemeState() -> ThemeState {
-        let user = currentUser()
-        return ThemeState(
-            userTheme: user?.userTheme,
-            predictedTheme: user?.predictedTheme
-        )
+    
+    /// Save Theme which was predicted for the User
+    func setPredictedTheme(theme: String) {
+        guard let user = currentUser() else { print("No valid user found.") ; return }
+        user.predictedTheme = theme
+        do {
+            try context.save()
+        } catch { print("Error saving theme: \(error.localizedDescription)") }
     }
     
     
@@ -119,7 +135,7 @@ class DataManager: ObservableObject {
         }
         
         do {
-            // Fetch or create the POI
+            /// Fetch or create the POI
             let poiFetch: NSFetchRequest<POI> = POI.fetchRequest()
             poiFetch.predicate = NSPredicate(format: "poiID == %@", poiID as CVarArg)
             poiFetch.fetchLimit = 1
@@ -128,7 +144,7 @@ class DataManager: ObservableObject {
             if let existingPOI = try context.fetch(poiFetch).first {
                 poi = existingPOI
             } else {
-                // Create a new POI if it doesn't exist
+                /// Create a new POI if it doesn't exist
                 poi = POI(context: context)
                 poi.poiID = poiID
                 poi.fid = fid
@@ -136,7 +152,7 @@ class DataManager: ObservableObject {
                 try context.save()
             }
             
-            // Fetch existing relevance score
+            /// Fetch existing relevance score
             let fetchRequest: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
             fetchRequest.predicate = NSPredicate(
                 format: "poiID == %@ AND userID == %@",
@@ -148,10 +164,9 @@ class DataManager: ObservableObject {
             let existingScores = try context.fetch(fetchRequest)
             
             if let existingScore = existingScores.first {
-                // Update existing score but PRESERVE all interaction data
+                /// Update existing score but PRESERVE all interaction data
                 existingScore.score = score
                 existingScore.fid = fid
-                // Don't change isFavorite, clickCount, or lastClickedDate - preserve them!
             } else {
                 let newScore = RelevanceScore(context: context)
                 newScore.userID = userID
@@ -171,7 +186,7 @@ class DataManager: ObservableObject {
         }
     }
     
-    // MARK: - User-Specific Favorites Management
+    // MARK: - Favorites Management
     
     /// Check if a POI is marked as favorite by the current user
     func isUserFavorite(poiID: UUID) -> Bool {
@@ -202,7 +217,7 @@ class DataManager: ObservableObject {
         }
         
         do {
-            // First, ensure the POI exists
+            /// Ensure the POI exists
             let fid = fid
             let poiFetch: NSFetchRequest<POI> = POI.fetchRequest()
             poiFetch.predicate = NSPredicate(format: "poiID == %@", poiID as CVarArg)
@@ -212,12 +227,12 @@ class DataManager: ObservableObject {
             if let existingPOI = try context.fetch(poiFetch).first {
                 poi = existingPOI
             } else {
-                // Create POI if it doesn't exist
+                /// Create POI if it doesn't exist
                 poi = POI(context: context)
                 poi.poiID = poiID
             }
             
-            // Now handle the user-specific favorite through RelevanceScore
+            /// Handle the user-specific favorite through RelevanceScore
             let scoreFetch: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
             scoreFetch.predicate = NSPredicate(
                 format: "user == %@ AND poiID == %@",
@@ -230,7 +245,7 @@ class DataManager: ObservableObject {
             if let existingScore = try context.fetch(scoreFetch).first {
                 relevanceScore = existingScore
             } else {
-                // Create new RelevanceScore if it doesn't exist
+                /// Create new RelevanceScore if it doesn't exist
                 relevanceScore = RelevanceScore(context: context)
                 relevanceScore.userID = userID
                 relevanceScore.poiID = poiID
@@ -242,17 +257,17 @@ class DataManager: ObservableObject {
                 relevanceScore.poi = poi
             }
             
-            // Set the user-specific favorite flag
+            /// Set the user-specific favorite flag
             relevanceScore.isFavorite = isFavorite
             
-            // If marking as favorite, boost the relevance score
+            /// If marking as favorite, boost the relevance score
             if isFavorite && relevanceScore.score < 0.8 {
                 relevanceScore.score = 0.8  // Boost score for favorites
             }
             
             try context.save()
             
-            // Post notification for UI updates
+            /// Post notification for UI updates
             NotificationCenter.default.post(name: .favoritesDidChange, object: nil)
             
             print("Set favorite status for user \(user.name ?? "Unknown"): POI \(poiID) = \(isFavorite)")
@@ -340,7 +355,7 @@ class DataManager: ObservableObject {
         }
         
         do {
-            // Ensure POI exists
+            /// Ensure POI exists
             let poiFetch: NSFetchRequest<POI> = POI.fetchRequest()
             poiFetch.predicate = NSPredicate(format: "poiID == %@", poiID as CVarArg)
             poiFetch.fetchLimit = 1
@@ -349,12 +364,12 @@ class DataManager: ObservableObject {
             if let existingPOI = try context.fetch(poiFetch).first {
                 poi = existingPOI
             } else {
-                // Create POI if it doesn't exist
+                /// Create POI if it doesn't exist
                 poi = POI(context: context)
                 poi.poiID = poiID
             }
             
-            // Get or create RelevanceScore for this user-POI pair
+            /// Get or create RelevanceScore for this user-POI pair
             let scoreFetch: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
             scoreFetch.predicate = NSPredicate(
                 format: "user == %@ AND poiID == %@",
@@ -367,27 +382,27 @@ class DataManager: ObservableObject {
             if let existingScore = try context.fetch(scoreFetch).first {
                 relevanceScore = existingScore
             } else {
-                // Create new RelevanceScore if it doesn't exist
+                /// Create new RelevanceScore if it doesn't exist
                 relevanceScore = RelevanceScore(context: context)
                 relevanceScore.userID = userID
                 relevanceScore.poiID = poiID
                 relevanceScore.fid = fid
-                relevanceScore.score = 0.5  // Default neutral score
+                relevanceScore.score = 0.5  /// Default neutral score
                 relevanceScore.clickCount = 0
                 relevanceScore.lastClickedDate = nil
                 relevanceScore.user = user
                 relevanceScore.poi = poi
             }
             
-            // Update user-specific interaction data
+            /// Update user-specific interaction data
             relevanceScore.clickCount += 1
             relevanceScore.lastClickedDate = Date()
             
-            // Handle favorite if specified
+            /// Handle favorite if specified
             if let isFavorite = isFavorite {
                 relevanceScore.isFavorite = isFavorite
                 if isFavorite && relevanceScore.score < 0.8 {
-                    relevanceScore.score = 0.8  // Boost score for favorites
+                    relevanceScore.score = 0.8  /// Boost score for favorites
                 }
             }
             
@@ -400,6 +415,7 @@ class DataManager: ObservableObject {
         }
     }
     
+    /// Get the interaction data of a specific POI
     func getPOIInteraction(poiID: UUID, context: NSManagedObjectContext) -> (isFavorite: Bool, clickCount: Int32, lastClickedDate: Date) {
         guard let user = currentUser() else {
             print("No current user to get interaction")
@@ -423,11 +439,11 @@ class DataManager: ObservableObject {
             print("Error fetching POI interaction: \(error)")
         }
         
-        // Return defaults if no interaction found
+        /// Return defaults if no interaction found
         return (false, 0, Date.distantPast)
     }
     
-    /// Clear all interactions for a user (useful when deleting user)
+    /// Clear all interactions of all POIs for a specific user (useful when deleting user)
     func clearUserInteractions(for user: UserProfile) {
         let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
         request.predicate = NSPredicate(format: "user == %@", user)

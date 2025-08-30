@@ -43,11 +43,18 @@ struct ContentView: View {
     @State private var showPopupSheet = false
     @State private var selectedDetent = PresentationDetent.medium
     
+    /// Variables for the Theme Change
     @State private var selectedTheme: ThemeCategory = .explore
     @State private var hasSyncedTheme = false
     
+    /// Variables for the Location Search
     @StateObject private var model = SearchModel()
     @State private var searchText: String = ""
+    
+    /// Variables for POI aggregation
+    @State private var currentViewpoint: Viewpoint?
+    @State private var lastKnownScale: Double = 1500
+
     
     /// PopUp State Variables
     @State private var showFavoritesPanel = true
@@ -216,9 +223,26 @@ struct ContentView: View {
                 map: map,
                 graphicsOverlays: [model.graphicsOverlay]
             )
-                .locationDisplay(locationDisplay)
+            .locationDisplay(locationDisplay)
+            .onViewpointChanged(kind: .centerAndScale) { newViewpoint in
+                // Update the viewpoint state
+                currentViewpoint = newViewpoint
+                
+                // Check if scale changed significantly
+                let newScale = newViewpoint.targetScale
+                // Only update if scale changed by more than 10%
+                let scaleChangeRatio = abs(newScale - lastKnownScale) / max(lastKnownScale, 1)
+                if scaleChangeRatio > 0.1 {
+                    lastKnownScale = newScale
+                    
+                    // Trigger aggregation update
+                    Task {
+                        await viewModel.handleMapScaleChange(newScale: newScale)
+                    }
+                }
+            }
             
-            // 1) Tap gesture
+            /// Tap gesture
             let withTap = baseMap
                 .onSingleTapGesture { screenPoint, _ in
                     identifyScreenPoint = screenPoint
@@ -233,7 +257,7 @@ struct ContentView: View {
                     }
                 }
             
-            // 2) Start location display
+            /// Start location display
             let withStartTask = withTap
                 .task {
                     let locationManager = CLLocationManager()
@@ -249,7 +273,7 @@ struct ContentView: View {
                     }
                 }
             
-            // 3) Identify layers on tap
+            /// Identify layers on tap
             let withIdentifyTask = withStartTask
                 .task(id: identifyScreenPoint) {
                     guard let identifyScreenPoint,
@@ -269,11 +293,11 @@ struct ContentView: View {
                     }
                 }
             
-            // 4) Alert on failure
+            /// Alert on failure
             let withAlert = withIdentifyTask
                 .alert("Location display failed to start", isPresented: $failedToStart) {}
             
-            // 5) Switch Day/Night mode
+            /// Switch Day/Night mode
             let withDayNight = withAlert
                 .onChange(of: settingsManager.isNightMode) {
                     print("Switching to \(settingsManager.isNightMode ? "night" : "day") mode")
@@ -297,7 +321,7 @@ struct ContentView: View {
                     }
                 }
             
-            // 6) React to POI updates
+            /// React to POI updates
             let withPOIReceive = withDayNight
                 .onReceive(viewModel.$displayedPOIs) { newPOIs in
                     layerUpdateTask?.cancel()
@@ -335,7 +359,7 @@ struct ContentView: View {
                     }
                 }
             
-            // 7) Handle navigate-to-POI notifications for the favorites saved and clicked in the panel overlay
+            /// Handle navigate-to-POI notifications for the favorites saved and clicked in the panel overlay
             let withNavigateReceive = withPOIReceive
                 .onReceive(NotificationCenter.default.publisher(for: .navigateToPOI)) { notification in
                     if let feature = notification.userInfo?["feature"] as? ArcGISFeature,
@@ -364,7 +388,7 @@ struct ContentView: View {
                     }
                 }
 
-            // 8) React to theme changes
+            /// React to theme changes
             let withThemeChange = withNavigateReceive
                 .onChange(of: settingsManager.theme) {
                     Task {
@@ -373,7 +397,7 @@ struct ContentView: View {
                     }
                 }
 
-            // Return the staged view
+            /// Return the staged view
             withThemeChange
         }
     }

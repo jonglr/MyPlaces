@@ -21,36 +21,45 @@ class SettingsManager: ObservableObject {
     static let shared = DataManager(context: PersistenceController.shared.container.viewContext)
     private let context: NSManagedObjectContext
     
+    // MARK: - Initialization
+    
     init(context: NSManagedObjectContext) {
         self.context = context
-        self.user = nil
         
-        // Load initial theme from CoreData
+        /// Try to load existing user immediately
+        self.user = DataManager.shared.currentUser()
+        
+        /// Load initial theme from CoreData
         let state = DataManager.shared.fetchThemeState()
         self.theme = state.userTheme ?? state.predictedTheme ?? "explore"
         
-        // Listen for theme changes from prediction
+        /// Listen for theme changes from prediction
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleThemeChange),
             name: .themeDidChange,
             object: nil
         )
+        /// Listen for user changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleUserChange),
+            name: .userDidChange,
+            object: nil
+        )
     }
+    
+    // MARK: - Theme Change Handling
+    
     @objc private func handleThemeChange(_ notification: Notification) {
         guard let newTheme = notification.userInfo?["theme"] as? String else { return }
         DispatchQueue.main.async { self.theme = newTheme }
     }
     
-    /// Add the user as soon as it's created after first App start
-    func adopt(user: UserProfile) {
-        self.user = user
-    }
-    
     func switchTheme(to newTheme: String) {
-        DataManager.shared.setUserTheme(theme:newTheme)
+        DataManager.shared.setUserTheme(theme: newTheme)
         self.theme = newTheme
-
+        
         NotificationCenter.default.post(
             name: .themeDidChange,
             object: nil,
@@ -59,20 +68,50 @@ class SettingsManager: ObservableObject {
         print("User selected theme: \(newTheme)")
     }
     
+    // MARK: - User Change Handling
+    
+    @objc private func handleUserChange(_ notification: Notification) {
+        /// Reload the current user when user changes
+        DispatchQueue.main.async {
+            self.user = DataManager.shared.currentUser()
+            
+            /// Also reload theme for the new user
+            let state = DataManager.shared.fetchThemeState()
+            self.theme = state.userTheme ?? state.predictedTheme ?? "explore"
+        }
+    }
+    
+    /// Add the user and properly notify observers
+    func adopt(user: UserProfile) {
+        DispatchQueue.main.async {
+            self.user = user
+            // Post notification to ensure all UI updates
+            NotificationCenter.default.post(name: .userDidChange, object: nil)
+        }
+    }
+    
     func switchUser(withID id: UUID) -> UserProfile {
         let request: NSFetchRequest<UserProfile> = UserProfile.fetchRequest()
         request.predicate = NSPredicate(format: "userID == %@", id as CVarArg)
         request.fetchLimit = 1
-
+        
         do {
             /// Deactivate all users
             let allUsers = try context.fetch(UserProfile.fetchRequest())
             allUsers.forEach { $0.isActive = false }
-
+            
             /// Activate the new active user
             if let existingUser = try context.fetch(request).first {
                 existingUser.isActive = true
                 try context.save()
+                
+                // Update the user property immediately
+                self.user = existingUser
+                
+                // Load the theme for the new user
+                let state = DataManager.shared.fetchThemeState()
+                self.theme = state.userTheme ?? state.predictedTheme ?? "explore"
+                
                 return existingUser
             } else {
                 fatalError("Could not activate new user")

@@ -49,8 +49,10 @@ class VariableManager {
         return s.userTheme ?? s.predictedTheme ?? "explore"
     }
     
-    // MARK: - Cache Properties
+    // MARK: - Cache Management
         
+    private var cachedData: CachedData?
+    
     private struct CachedData {
         let weather: Double
         let environment: Double
@@ -63,18 +65,14 @@ class VariableManager {
         }
     }
         
-    private var cachedData: CachedData?
-        
-    // MARK: - Cache Management
-        
     /// Refreshes cached data (weather, environment, user location) for relevance calculations
     func refreshCachedData() async -> Bool {
-        // Check if cache is still valid
+        /// Check if cache is still valid
         if let cached = cachedData, cached.isValid {
             return true
         }
 
-        // Get current user location
+        /// Get current user location
         guard let currentLocation = getEffectiveLocationPoint() else {
             print("Failed to get location for cache refresh")
             return false
@@ -82,19 +80,19 @@ class VariableManager {
         
         print("Refreshing cached data...")
         
-        // cancel existing tasks
+        /// cancel existing tasks
         weatherTask?.cancel()
         environmentTask?.cancel()
         
-        // Create new tasks
+        /// Create new tasks
         weatherTask = Task { await currentWeather(for: currentLocation) }
         environmentTask = Task { await currentEnvironment(for: currentLocation) }
                 
-        // Wait for both
+        /// Wait for both
         let weather = await weatherTask?.value ?? 2.0
         let environment = await environmentTask?.value ?? 1.0
         
-        // Cache the new data
+        /// Cache the new data
         cachedData = CachedData(
             weather: weather,
             environment: environment,
@@ -182,7 +180,8 @@ class VariableManager {
     func currentSpeed() -> Double {
         let locationManager = CLLocationManager()
         if let speed = locationManager.location?.speed, speed >= 0 {
-            return speed * 3.6 // Convert m/s to km/h
+            /// Convert m/s to km/h
+            return speed * 3.6
         }
         return 0.0
     }
@@ -197,7 +196,7 @@ class VariableManager {
             return cached.environment
         }
         
-        // Get current location and fetch environment
+        /// Get current location and fetch environment
         guard let point = getCurrentLocationPoint() else {
             print("No valid user location.")
             return 1.0
@@ -230,15 +229,25 @@ class VariableManager {
         }
         return 1.0
     }
+    
+    /// Maps evironment type strings to doubles
+    private func envTypeToDouble(from desc: String) -> Double {
+        switch desc {
+        case "Städtisch (1)": return 0.0
+        case "Intermediär (2)": return 1.0
+        case "Ländlich (3)": return 2.0
+        default: return 1.0 /// Default to rural if unknown type
+        }
+    }
         
     /// Uses the current weather data and converts them in an output for 1: Sunny, 2: Cloudy, 3: Rainy
     func currentWeather() async -> Double {
-        // Use cached version if available
+        /// Use cached version if available
         if let cached = cachedData, cached.isValid {
             return cached.weather
         }
         
-        // Get current location and fetch weather
+        /// Get current location and fetch weather
         guard let point = getCurrentLocationPoint() else {
             return 2.0
         }
@@ -261,17 +270,17 @@ class VariableManager {
         } catch {
             print("Weather fetch error:", error.localizedDescription)
         }
-        
-        return 2.0 // Default cloudy
+        /// Default cloudy
+        return 2.0
     }
-        
-    /// Maps evironment type strings to doubles
-    private func envTypeToDouble(from desc: String) -> Double {
-        switch desc {
-        case "Städtisch (1)": return 0.0
-        case "Intermediär (2)": return 1.0
-        case "Ländlich (3)": return 2.0
-        default: return 1.0 /// Default to rural if unknown type
+    
+    /// Maps the weather code to a double
+    func mapWeatherCodeToScore(_ code: Int) -> Double {
+        switch code {
+        case 0, 1: return 1.0 /// Sunny
+        case 2, 3: return 2.0 /// Cloudy
+        case 51...67, 80...99: return 3.0 /// Rain, snow, storms
+        default: return 2.0   /// Cloudy as default fallback
         }
     }
         
@@ -290,16 +299,6 @@ class VariableManager {
             spatialReference: .wgs84
         )
         return userPoint
-    }
-        
-    /// Maps the weather code to a double
-    func mapWeatherCodeToScore(_ code: Int) -> Double {
-        switch code {
-        case 0, 1: return 1.0 /// Sunny
-        case 2, 3: return 2.0 /// Cloudy
-        case 51...67, 80...99: return 3.0 /// Rain, snow, storms
-        default: return 2.0   /// Cloudy as default fallback
-        }
     }
     
     
@@ -328,7 +327,7 @@ class VariableManager {
         /// Parse current weekday and time
         let now = Date()
         let formatter = DateFormatter()
-        formatter.dateFormat = "E"  // Short weekday name
+        formatter.dateFormat = "E"  /// Short weekday name
         let currentDay = formatter.string(from: now)
         
         formatter.dateFormat = "HH:mm"
@@ -353,7 +352,7 @@ class VariableManager {
                 daysPart = parts[0]
                 timePart = parts[1]
             } else if parts.count == 1 {
-                // No day range given, assume applies every day
+                /// No day range given, assume applies every day
                 daysPart = "Mo-Su"
                 timePart = parts[0]
             } else {
@@ -389,14 +388,14 @@ class VariableManager {
     
     /// Calculate distance between two Point geometries (handles projected coordinates)
     func calculateDistance(from point1: Point, to point2: Point) -> Double {
-        // Check if coordinates look like projected coordinates (large values)
+        /// Check if coordinates look like projected coordinates (large values)
         if abs(point1.x) > 180 || abs(point1.y) > 90 || abs(point2.x) > 180 || abs(point2.y) > 90 {
-            // These are projected coordinates, use simple Euclidean distance
+            /// These are projected coordinates, use simple Euclidean distance
             let deltaX = point1.x - point2.x
             let deltaY = point1.y - point2.y
             return sqrt(deltaX * deltaX + deltaY * deltaY)
         } else {
-            // These are lat/lon coordinates, use CLLocation
+            /// These are lat/lon coordinates, use CLLocation
             let location1 = CLLocation(latitude: point1.y, longitude: point1.x)
             let location2 = CLLocation(latitude: point2.y, longitude: point2.x)
             return location1.distance(from: location2)
@@ -443,10 +442,9 @@ class VariableManager {
         let isFavorite: Double
         if fav {isFavorite = 1.0}
         else {isFavorite = 0.0}
-        
         let clickCount: Double = Double(click)
-        
-        let now = Date()  // current date and time
+        /// current date and time
+        let now = Date()
         /// Calculate the amount of days difference and then safely convert it into a Double datatype
         let calendar = Calendar.current
         let components = calendar.dateComponents([.day], from: days, to: now)
@@ -455,6 +453,7 @@ class VariableManager {
         return (isFavorite, clickCount, daysAgo)
     }
     
+    /// Returns the information if the POI has a name stored (for filtering and efficient data fetching)
     func hasName (poi: Feature) -> Double {
         let name = poi.attributes["name"]
         if name != nil {

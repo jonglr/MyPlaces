@@ -6,8 +6,7 @@
 //
 
 /// **Class Functions**
-/// Manages user interactions with the MapView.
-/// Calculates and updates relevance scores
+/// Manages user interactions with the MapView
 
 import SwiftUI
 import CoreData
@@ -24,6 +23,7 @@ class ContentViewModel: NSObject, ObservableObject {
     private var remoteFavoriteCache: [Int64: ArcGISFeature] = [:]
     /// The visualization of the relevant POIs that get overlayed onto the rest of the POIs
     @Published var displayedPOIs: [ArcGISFeature] = []
+    
     /// Exposed flag to display the loading sign in the view model
     @Published var isComputingRelevance = false
     /// Expose search location state to the UI
@@ -49,38 +49,19 @@ class ContentViewModel: NSObject, ObservableObject {
     private var currentSearchLocation: Point?
     private var relevanceUpdateTask: Task<Void, Never>?
     
+    /// Aggregation control properties
+    @Published var currentMapScale: Double = 1500 /// Default scale
+    private var lastAggregationScale: Double = 0
+    private var aggregationTask: Task<Void, Never>?
+    private var unfilteredRelevantPOIs: [ArcGISFeature] = [] /// Store POIs before aggregation
+    /// Threshold for scale change to trigger re-aggregation
+    private let scaleChangeThreshold: Double = 0.2 /// 20% change
+    
     /// Search Attributes
     let graphicsOverlay = GraphicsOverlay()
     let locator = LocatorTask(
         url: URL(string: "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer")!
     )
-    
-    // MARK: - Theme Mapping Helper
-    
-    /// Looks up the corresponding fclasses that match the thematic map choice
-    private lazy var themeMappings: [String: [Double]] = {
-        guard let url = Bundle.main.url(forResource: "theme_mappings", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let mappings = json["themeMappings"] as? [String: [String: Any]] else {
-            print("Failed to load theme mappings")
-            return [:]
-        }
-        
-        var result: [String: [Double]] = [:]
-        for (themeId, themeData) in mappings {
-            if let fclasses = themeData["fclasses"] as? [Double] {
-                result[themeId] = fclasses
-            }
-        }
-        return result
-    }()
-    
-    private func getFclassesForTheme(_ theme: Double) -> [Double] {
-        let themeKey = String(Int(theme))
-        return themeMappings[themeKey] ?? []
-    }
-    
     
     // MARK: - Initialization
     
@@ -110,20 +91,24 @@ class ContentViewModel: NSObject, ObservableObject {
         )
     }
     
-    /// Async Initialization of the POIModel
-    @MainActor
-    private func initializePOIModel() async {
-        let model = await POIModel(variableManager: variableManager) // Initialize asynchronously
-        await MainActor.run {
-            self.poiModel = model
-            self.allPOIs = model.POIs
+    /// Sets up the initialization of the map view for a new user
+    @objc private func handleUserChange() {
+        Task { @MainActor in
+            /// Clear current data
+            displayedPOIs.removeAll()
+            
+            /// Reload everything for the new user
+            await updateTheme()
+            await updateRelevance()
+            await loadRelevanceScores()
         }
     }
+    
+    // MARK: - Relevance Predictions
     
     /// Load Relevance Scores and Filter POIs
     @MainActor
     func loadRelevanceScores() async {
-        await MainActor.run {
             guard dataManager.currentUser() != nil else {
                 print("No user logged in.")
                 return
@@ -149,7 +134,7 @@ class ContentViewModel: NSObject, ObservableObject {
                 }
                 return (poi: poi, score: score, fclass: fclass)
             }
-                
+            
             /// Separate POIs into themed and non-themed groups
             let themedPOIs = relevantPOIs.filter { themeClasses.isEmpty || themeClasses.contains($0.fclass) }
             let nonThemedPOIs = relevantPOIs.filter { !themeClasses.isEmpty && !themeClasses.contains($0.fclass) }
@@ -169,26 +154,191 @@ class ContentViewModel: NSObject, ObservableObject {
             let discoveryTargetCount = min(availableThemedCount, availableDiscoveryCount)
             let selectedDiscoveryPOIs = Array(sortedNonThemedPOIs.prefix(discoveryTargetCount))
             
-            /// Combine all selected POIs
-            let combinedPOIs = (selectedThemedPOIs + selectedDiscoveryPOIs).map { $0.poi }
+            /// Combine all POIs and store them for re-aggregation
+            self.unfilteredRelevantPOIs = (selectedThemedPOIs + selectedDiscoveryPOIs).map { $0.poi }
             
             print("Themed POIs: \(selectedThemedPOIs.count), Discovery POIs: \(selectedDiscoveryPOIs.count)")
-            print("Total POIs before aggregation: \(combinedPOIs.count)")
+            print("Total POIs before aggregation: \(unfilteredRelevantPOIs.count)")
             
-            /// Apply aggregation to remove overlapping POIs with the threshold of X meters
-            let filteredGeneralizedPOIs = filterOverlappingPOIs(pois: combinedPOIs, threshold: 30)
-            print("Filtered POIs after aggregation: \(filteredGeneralizedPOIs.count)")
-            
-            /// Update displayed POIs
-            self.displayedPOIs = filteredGeneralizedPOIs
+            /// Apply initial aggregation with current scale
+            await performAggregation()
             
             print("All POIs: \(allPOIs.count) Loaded Relevant POIs: \(displayedPOIs.count)")
             print("Current theme: \(currentTheme) (\(getThemeName(currentTheme)))")
+    }
+    
+    /// Helper function to get relevance score for a POI
+    func getRelevanceScore(for poi: ArcGISFeature) -> Double {
+        guard let user = dataManager.currentUser(),
+              let fidAny = poi.attributes["fid"],
+              let fid = (fidAny as? NSNumber)?.int64Value else { return 0.0 }
+        
+        let poiID = variableManager.uuidFromFID(fid)
+        
+        let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
+        request.predicate = NSPredicate(format: "user == %@ AND poiID == %@", user, poiID as CVarArg)
+        
+        do {
+            let scores = try context.fetch(request)
+                    let score = scores.first?.score ?? 0.0
+                    return score
+        } catch {
+            print("Error fetching relevance score: \(error)")
+            return 0.0
+        }
+    }
+    
+    /// Relevance Score Calculation by the ML Model
+    func updateRelevance() async {
+        
+        /// Handling the loading overlay
+        await MainActor.run {
+            isComputingRelevance = true
+        }
+        defer {
+            Task { @MainActor in
+                isComputingRelevance = false
+            }
+        }
+        print("Predicting relevance scores...")
+        
+        /// Refresh cached data once at the beginning of relevance calculation cycle
+        let cacheRefreshSuccess = await variableManager.refreshCachedData()
+        if !cacheRefreshSuccess {
+            print("Failed to refresh cached data, using fallback values")
+        }
+        
+        /// Get cached values that will be used for all POIs
+        let cachedWeather = await variableManager.getCachedWeather()
+        let currentSpeed = variableManager.currentSpeed()
+        let currentTheme = variableManager.currentUserTheme()
+        
+        for poi in allPOIs {
+            /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
+            guard let fclassRaw = poi.attributes["fclass"] as? String,
+                  let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
+                continue
+            }
+            
+            /// Convert the ID to a UUID
+            if let fidAny = poi.attributes["fid"],
+               let fid = (fidAny as? NSNumber)?.int64Value {
+                /// Transform the fid value into a UUID
+                let poiID = variableManager.uuidFromFID(fid)
+                
+                /// get the attributes for the score computation ot the poi
+                let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
+                let otherTags = poi.attributes["other_tags"] as? String ?? ""
+                let (open, hasOpeningHours) = variableManager.isOpen(otherTags: otherTags)
+                let distance = variableManager.calculateDistanceToUser(origin: poi)
+                let hasName = variableManager.hasName(poi: poi)
+                
+                /// compute the relevance Score using cached values
+                let score = relevanceModelManager.predictRelevance(
+                    distance: distance,
+                    speed: currentSpeed,
+                    weather: cachedWeather,
+                    isOpen: open,
+                    favorite: isFavorite,
+                    clickCount: clickCount,
+                    lastClickedDate: daysAgo,
+                    theme: currentTheme,
+                    fclass: fclass,
+                    hasName: hasName,
+                    hasOpeningHours: hasOpeningHours
+                )
+                /// Simple main thread dispatch
+                await MainActor.run {
+                    dataManager.saveRelevanceScore(for: poiID, score: score, fid: fid,)
+                }
+            } else {
+                print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
+            }
+            
+        }
+    }
+    
+    // MARK: - Thematic Predictions
+    
+    /// Helper function to get theme name for logging
+    private func getThemeName(_ theme: Double) -> String {
+        let themeKey = String(Int(theme))
+        guard let url = Bundle.main.url(forResource: "theme_mappings", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let mappings = json["themeMappings"] as? [String: [String: Any]],
+              let themeData = mappings[themeKey],
+              let name = themeData["name"] as? String else {
+            return "Unknown"
+        }
+        return name
+    }
+    
+    /// Update theme and notify the UI
+    private func updateTheme() async {
+        // Ensure we have environment data before predicting
+        let environment = await variableManager.getCachedEnvironment()
+        
+        let predictedTheme = thematicModelManager.predictTheme(
+            timeOfDay: variableManager.currentTimeOfDay(),
+            dayOfWeek: variableManager.currentDay(),
+            environmentType: environment  // Use the cached value
+        )
+        
+        print("Predicting theme ...")
+        
+        await MainActor.run {
+            // Save the newly predicted theme
+            dataManager.setPredictedTheme(theme: predictedTheme)
+            dataManager.clearUserTheme()
+            
+            // Notify SettingsManager of the change
+            NotificationCenter.default.post(
+                name: .themeDidChange,
+                object: nil,
+                userInfo: ["theme": predictedTheme, "source": "prediction"]
+            )
+        }
+    }
+    
+    /// Looks up the corresponding fclasses that match the thematic map choice
+    private lazy var themeMappings: [String: [Double]] = {
+        guard let url = Bundle.main.url(forResource: "theme_mappings", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let mappings = json["themeMappings"] as? [String: [String: Any]] else {
+            print("Failed to load theme mappings")
+            return [:]
+        }
+        
+        var result: [String: [Double]] = [:]
+        for (themeId, themeData) in mappings {
+            if let fclasses = themeData["fclasses"] as? [Double] {
+                result[themeId] = fclasses
+            }
+        }
+        return result
+    }()
+    
+    private func getFclassesForTheme(_ theme: Double) -> [Double] {
+        let themeKey = String(Int(theme))
+        return themeMappings[themeKey] ?? []
+    }
+    
+    // MARK: - POI Handling
+    
+    /// Async Initialization of the POIModel
+    @MainActor
+    private func initializePOIModel() async {
+        let model = await POIModel(variableManager: variableManager) // Initialize asynchronously
+        await MainActor.run {
+            self.poiModel = model
+            self.allPOIs = model.POIs
         }
     }
     
     /// Load favorite POIs directly by their FIDs
-        @MainActor
+    @MainActor
     func loadFavoritePOIsByFID() async {
         // Get FIDs of all user favorites
         let favoriteFIDs = dataManager.getUserFavoriteFIDs()
@@ -281,161 +431,133 @@ class ContentViewModel: NSObject, ObservableObject {
         return nil
     }
     
-    /// Helper function to get theme name for logging
-    private func getThemeName(_ theme: Double) -> String {
-        let themeKey = String(Int(theme))
-        guard let url = Bundle.main.url(forResource: "theme_mappings", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let mappings = json["themeMappings"] as? [String: [String: Any]],
-              let themeData = mappings[themeKey],
-              let name = themeData["name"] as? String else {
-            return "Unknown"
+    /// POI reloading for a specific location
+    @MainActor
+    private func reloadPOIsForLocation(_ location: Point) async {
+        guard let poiModel = self.poiModel else {
+            print("POI model not available for reloading")
+            return
         }
-        return name
+        /// Load POIs around the specified location
+        await poiModel.loadPOIsAroundLocation(location: location)
+        
+        /// Update our local POI array
+        self.allPOIs = poiModel.POIs
+        
+        print("Reloaded \(allPOIs.count) POIs for location")
     }
     
-    /// Helper function to get relevance score for a POI
-    func getRelevanceScore(for poi: ArcGISFeature) -> Double {
-        guard let user = dataManager.currentUser(),
-              let fidAny = poi.attributes["fid"],
-              let fid = (fidAny as? NSNumber)?.int64Value else { return 0.0 }
-        
-        let poiID = variableManager.uuidFromFID(fid)
-        
-        let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
-        request.predicate = NSPredicate(format: "user == %@ AND poiID == %@", user, poiID as CVarArg)
-        
-        do {
-            let scores = try context.fetch(request)
-                    let score = scores.first?.score ?? 0.0
-                    return score
-        } catch {
-            print("Error fetching relevance score: \(error)")
-            return 0.0
-        }
-    }
-    
-    
-    // MARK: - Model Predictons
-    
-    /// Relevance Score Calculation by the ML Model
-    func updateRelevance() async {
-        
-        /// Handling the loading overlay
-        await MainActor.run {
-            isComputingRelevance = true
-        }
-        defer {
-            Task { @MainActor in
-                isComputingRelevance = false
-            }
-        }
-        print("Predicting relevance scores...")
-        
-        /// Refresh cached data once at the beginning of relevance calculation cycle
-        let cacheRefreshSuccess = await variableManager.refreshCachedData()
-        if !cacheRefreshSuccess {
-            print("Failed to refresh cached data, using fallback values")
-        }
-        
-        /// Get cached values that will be used for all POIs
-        let cachedWeather = await variableManager.getCachedWeather()
-        let currentSpeed = variableManager.currentSpeed()
-        let currentTheme = variableManager.currentUserTheme()
-        
-        for poi in allPOIs {
-            /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
-            guard let fclassRaw = poi.attributes["fclass"] as? String,
-                  let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
-                continue
-            }
+    /// Make a POI temporarely visible
+    @MainActor
+    func ensurePOIVisible(_ feature: ArcGISFeature) async {
+        /// Check if POI is already in displayed POIs
+        if let fidAny = feature.attributes["fid"],
+           let fid = (fidAny as? NSNumber)?.int64Value {
             
-            /// Convert the ID to a UUID
-            if let fidAny = poi.attributes["fid"],
-               let fid = (fidAny as? NSNumber)?.int64Value {
-                /// Transform the fid value into a UUID
-                let poiID = variableManager.uuidFromFID(fid)
-                
-                /// get the attributes for the score computation ot the poi
-                let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
-                let otherTags = poi.attributes["other_tags"] as? String ?? ""
-                let (open, hasOpeningHours) = variableManager.isOpen(otherTags: otherTags)
-                let distance = variableManager.calculateDistanceToUser(origin: poi)
-                let hasName = variableManager.hasName(poi: poi)
-                
-                /// compute the relevance Score using cached values
-                let score = relevanceModelManager.predictRelevance(
-                    distance: distance,
-                    speed: currentSpeed,
-                    weather: cachedWeather,
-                    isOpen: open,
-                    favorite: isFavorite,
-                    clickCount: clickCount,
-                    lastClickedDate: daysAgo,
-                    theme: currentTheme,
-                    fclass: fclass,
-                    hasName: hasName,
-                    hasOpeningHours: hasOpeningHours
-                )
-                /// Simple main thread dispatch
-                await MainActor.run {
-                    dataManager.saveRelevanceScore(for: poiID, score: score, fid: fid,)
+            let variableManager = VariableManager()
+            let poiID = variableManager.uuidFromFID(fid)
+            
+            /// If not in displayed POIs, temporarily add it with high relevance
+            let isDisplayed = displayedPOIs.contains { poi in
+                if let poiFidAny = poi.attributes["fid"],
+                   let poiFid = (poiFidAny as? NSNumber)?.int64Value {
+                    return poiFid == fid
                 }
-            } else {
-                print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
+                return false
             }
             
+            if !isDisplayed {
+                /// Temporarily add this POI to displayed POIs
+                var updatedPOIs = displayedPOIs
+                updatedPOIs.append(feature)
+                displayedPOIs = updatedPOIs
+                
+                /// Ensure it has a high relevance score so it shows up
+                dataManager.saveRelevanceScore(for: poiID, score: 0.9, fid: fid )
+            }
         }
     }
     
-    /// Update theme and notify the UI
-    private func updateTheme() async {
-        // Ensure we have environment data before predicting
-        let environment = await variableManager.getCachedEnvironment()
+    // MARK: - POI Aggregation
+    
+    private func getAggregationThreshold(for scale: Double) -> Double {
+        switch scale {
+        case 0..<500:
+            return 3.0     // Very close: 3m
+        case 500..<1500:
+            return 10.0    // Close: 10m
+        case 1500..<3000:
+            return 20.0    // Medium close: 20m
+        case 3000..<8000:
+            return 40.0    // Medium: 40m
+        case 8000..<20000:
+            return 100.0    // Medium far: 80m
+        case 20000..<50000:
+            return 200.0   // Far: 150m
+        case 50000..<100000:
+            return 400.0   // Very far: 300m
+        case 100000..<500000:
+            return 1000.0  // City level: 1km
+        default:
+            return 2000.0  // Region level: 2km
+        }
+    }
+    
+    /// Trigger re-aggregation when scale changes significantly
+        @MainActor
+    func handleMapScaleChange(newScale: Double) async {
+        /// Check if scale changed significantly (more than threshold)
+        let scaleChangeRatio = abs(newScale - lastAggregationScale) / max(lastAggregationScale, 1)
         
-        let predictedTheme = thematicModelManager.predictTheme(
-            timeOfDay: variableManager.currentTimeOfDay(),
-            dayOfWeek: variableManager.currentDay(),
-            environmentType: environment  // Use the cached value
+        guard scaleChangeRatio > scaleChangeThreshold else {
+            /// Scale change too small, skip re-aggregation
+            return
+        }
+        
+        currentMapScale = newScale
+        
+        /// Cancel any pending aggregation
+        aggregationTask?.cancel()
+        
+        /// Debounce: wait 300ms before aggregating
+        aggregationTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000) /// 0.3 seconds
+            
+            guard !Task.isCancelled else { return }
+            
+            await performAggregation()
+            lastAggregationScale = newScale
+        }
+    }
+    
+    /// Perform the actual aggregation with current scale
+    @MainActor
+    private func performAggregation() async {
+        guard !unfilteredRelevantPOIs.isEmpty else { return }
+        
+        let threshold = getAggregationThreshold(for: currentMapScale)
+        print("Aggregating POIs with threshold: \(threshold)m at scale: \(currentMapScale)")
+        
+        let aggregatedPOIs = filterOverlappingPOIs(
+            pois: unfilteredRelevantPOIs,
+            threshold: threshold
         )
         
-        print("Predicting theme ...")
+        /// Update displayed POIs
+        self.displayedPOIs = aggregatedPOIs
         
-        await MainActor.run {
-            // Save the newly predicted theme
-            dataManager.setPredictedTheme(theme: predictedTheme)
-            dataManager.clearUserTheme()
-            
-            // Notify SettingsManager of the change
-            NotificationCenter.default.post(
-                name: .themeDidChange,
-                object: nil,
-                userInfo: ["theme": predictedTheme, "source": "prediction"]
-            )
-        }
+        print("Aggregation complete: \(unfilteredRelevantPOIs.count) -> \(aggregatedPOIs.count) POIs")
     }
     
-    
-    // MARK: - User Interactions
-    
-    func markPOIAsFavorite(poi: ArcGISFeature) {
-        if let fidAny = poi.attributes["fid"],
-           let fid = (fidAny as? NSNumber)?.int64Value {
-            let poiID = variableManager.uuidFromFID(fid)
-            dataManager.updatePOIInteraction(poiID: poiID, context: context, isFavorite: true, fid: fid)
+    /// Quickly re-aggregate existing POIs without recalculating relevance
+    @MainActor
+    func quickReaggregate() async {
+        guard !unfilteredRelevantPOIs.isEmpty else {
+            print("No POIs to re-aggregate")
+            return
         }
+        await performAggregation()
     }
-    
-    func recordPOIClick(poi: ArcGISFeature) {
-        if let fidAny = poi.attributes["fid"],
-           let fid = (fidAny as? NSNumber)?.int64Value {
-            let poiID = variableManager.uuidFromFID(fid)
-            dataManager.updatePOIInteraction(poiID: poiID, context: context, fid: fid)
-        }
-    }
-    
-    // MARK: - Aggregation of Close POIs
     
     /// Generalizes close POIs such that the higher POI will be preferred and displayed
     func filterOverlappingPOIs(pois: [ArcGISFeature], threshold: Double) -> [ArcGISFeature] {
@@ -504,6 +626,24 @@ class ContentViewModel: NSObject, ObservableObject {
         /// Apply theme boost if POI matches current theme (or if theme is "explore" which has empty fclasses)
         let isOnTheme = themeClasses.isEmpty || themeClasses.contains(fclass)
         return isOnTheme ? baseScore + themeBoost : baseScore
+    }
+    
+    // MARK: - User Interactions
+    
+    func markPOIAsFavorite(poi: ArcGISFeature) {
+        if let fidAny = poi.attributes["fid"],
+           let fid = (fidAny as? NSNumber)?.int64Value {
+            let poiID = variableManager.uuidFromFID(fid)
+            dataManager.updatePOIInteraction(poiID: poiID, context: context, isFavorite: true, fid: fid)
+        }
+    }
+    
+    func recordPOIClick(poi: ArcGISFeature) {
+        if let fidAny = poi.attributes["fid"],
+           let fid = (fidAny as? NSNumber)?.int64Value {
+            let poiID = variableManager.uuidFromFID(fid)
+            dataManager.updatePOIInteraction(poiID: poiID, context: context, fid: fid)
+        }
     }
     
     // MARK: - Location Monitoring
@@ -633,23 +773,7 @@ class ContentViewModel: NSObject, ObservableObject {
         await relevanceUpdateTask?.value
     }
     
-    /// Unified POI reloading for any location
-    @MainActor
-    private func reloadPOIsForLocation(_ location: Point) async {
-        guard let poiModel = self.poiModel else {
-            print("POI model not available for reloading")
-            return
-        }
-        // Load POIs around the specified location
-        await poiModel.loadPOIsAroundLocation(location: location)
-        
-        // Update our local POI array
-        self.allPOIs = poiModel.POIs
-        
-        print("Reloaded \(allPOIs.count) POIs for location")
-    }
-    
-    // MARK: - Public Interface Methods
+    // MARK: - Location Change Public Interface Methods
     
     /// Handle location change triggered by search
     @MainActor
@@ -678,62 +802,19 @@ class ContentViewModel: NSObject, ObservableObject {
         return variableManager.getCurrentLocationPoint()
     }
 
-    /// Load relevance/POIs at the given point
+    /// Change the location back to the user location and force update
     @MainActor
     func completeReturnToUserLocation(_ userLocation: Point) async {
         await locationChange(newLocation: userLocation, forceUpdate: true)
     }
-    
-    @MainActor
-    func ensurePOIVisible(_ feature: ArcGISFeature) async {
-        // Check if POI is already in displayed POIs
-        if let fidAny = feature.attributes["fid"],
-           let fid = (fidAny as? NSNumber)?.int64Value {
-            
-            let variableManager = VariableManager()
-            let poiID = variableManager.uuidFromFID(fid)
-            
-            // If not in displayed POIs, temporarily add it with high relevance
-            let isDisplayed = displayedPOIs.contains { poi in
-                if let poiFidAny = poi.attributes["fid"],
-                   let poiFid = (poiFidAny as? NSNumber)?.int64Value {
-                    return poiFid == fid
-                }
-                return false
-            }
-            
-            if !isDisplayed {
-                // Temporarily add this POI to displayed POIs
-                var updatedPOIs = displayedPOIs
-                updatedPOIs.append(feature)
-                displayedPOIs = updatedPOIs
-                
-                // Ensure it has a high relevance score so it shows up
-                dataManager.saveRelevanceScore(for: poiID, score: 0.9, fid: fid )
-            }
-        }
-    }
-    
-    @objc private func handleUserChange() {
-        Task { @MainActor in
-            // Clear current data
-            displayedPOIs.removeAll()
-            
-            // Reload everything for the new user
-            await updateTheme()
-            await updateRelevance()
-            await loadRelevanceScores()
-        }
-    }
-    
 }
     
     // MARK: - CLLocationManagerDelegate Extension
 
 /// This is a CLLocationManagerDelegate extension that handles iOS location services callbacks. It's responsible for:
-/// Receiving location updates from iOS when the user moves
-/// Handling location permission changes
-/// Managing location service errors
+/// - Receiving location updates from iOS when the user moves
+/// - Handling location permission changes
+/// - Managing location service errors
 
 extension ContentViewModel: CLLocationManagerDelegate {
     
@@ -751,7 +832,7 @@ extension ContentViewModel: CLLocationManagerDelegate {
                 }
         
         Task {
-            // Use the unified location handler for user movement
+            /// Use the unified location handler for user movement
             await locationChange(
                 clLocation: newLocation,
                 isSearchTriggered: false
@@ -768,16 +849,16 @@ extension ContentViewModel: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
         switch status {
         case .authorizedWhenInUse, .authorizedAlways:
-            // Permission granted - start receiving location updates
+            /// Permission granted - start receiving location updates
             locationManager.startUpdatingLocation()
             print("Location authorization granted")
             
         case .denied, .restricted:
-            // Permission denied - handle gracefully
+            /// Permission denied - handle gracefully
             print("Location access denied or restricted")
             
         case .notDetermined:
-            // Permission not yet requested - ask for it
+            /// Permission not yet requested - ask for it
             locationManager.requestWhenInUseAuthorization()
             print("Requesting location authorization")
             

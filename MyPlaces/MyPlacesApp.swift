@@ -19,7 +19,6 @@ struct MyPlacesApp: App {
     let persistenceController = PersistenceController.shared
     @StateObject private var dataManager: DataManager
     @StateObject private var settingsManager: SettingsManager
-    @AppStorage("hasOnboarded") private var hasOnboarded: Bool = false
     
     init(){
         ArcGISEnvironment.apiKey = APIKey(Keys.apiKey)
@@ -35,20 +34,26 @@ struct MyPlacesApp: App {
     
     var body: some SwiftUI.Scene {
         WindowGroup {
-            Group{
-                if hasOnboarded {
+            Group {
+                /// Check if a user actually exists in Core Data
+                if dataManager.hasUser() {
                     ContentView()
+                        .onAppear {
+                            /// Ensure SettingsManager has the current user loaded
+                            if settingsManager.user == nil {
+                                settingsManager.user = dataManager.currentUser()
+                            }
+                        }
                 } else {
-                    OnboardingView(onUserCreated: { user in
+                    OnboardingView { user in
+                        /// User was successfully created
                         settingsManager.adopt(user: user)
-                        hasOnboarded = true
-                    })
+                    }
                 }
             }
             .environmentObject(dataManager)
             .environmentObject(settingsManager)
             .environment(\.managedObjectContext, persistenceController.container.viewContext)
-            
         }
     }
 }

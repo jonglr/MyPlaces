@@ -28,13 +28,13 @@ class POIModel {
     init(variableManager: VariableManager) async {
            self.variableManager = variableManager
            
-           // Create ServiceFeatureTable directly
+           /// Create ServiceFeatureTable directly
            let portalItem = PortalItem(
                portal: .arcGISOnline(connection: .authenticated),
                id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
            )
            
-           // Create ServiceFeatureTable directly instead of through FeatureLayer
+           /// Create ServiceFeatureTable directly instead of through FeatureLayer
            let serviceTable = ServiceFeatureTable(item: portalItem)
            
            do {
@@ -54,10 +54,10 @@ class POIModel {
 
     /// Load POIs around a specific location (used for search results)
     func loadPOIsAroundLocation(location: Point?) async {
-        // Cancel any existing query
+        /// Cancel any existing query
         currentQueryTask?.cancel()
         
-        // Prevent concurrent queries
+        /// Prevent concurrent queries
         guard !isLoading else {
             print("POI loading already in progress, skipping")
             return
@@ -73,6 +73,7 @@ class POIModel {
         await currentQueryTask?.value
     }
 
+    /// Fetches the POIs around the defined buffer from ArcGIS Online
     private func performPOIQuery(location: Point?) async {
         let userPoint: Point?
         
@@ -91,7 +92,7 @@ class POIModel {
         guard let point = userPoint else { return }
         
         /// Create a bounding box around the location
-        let buffer: Double = 0.0225 // ~2.5km buffer in degrees
+        let buffer: Double = 0.0225 /// ~2.5km buffer in degrees
         let envelope = Envelope(
             xMin: point.x - buffer,
             yMin: point.y - buffer,
@@ -102,7 +103,7 @@ class POIModel {
         
         /// Query all features within the bounding box
         do {
-            // Check if task was cancelled
+            /// Check if task was cancelled
             guard !Task.isCancelled else {
                 print("POI query was cancelled")
                 return
@@ -111,7 +112,7 @@ class POIModel {
             let query = QueryParameters()
             query.geometry = envelope
             query.spatialRelationship = .intersects
-            query.whereClause = "name IS NOT NULL AND name <> ''" // filter out unneccessary POI fetching of incomplete POIs to make the app more efficient
+            query.whereClause = "name IS NOT NULL AND name <> ''" /// filter out unneccessary POI fetching of incomplete POIs to make the app more efficient
             
             guard let featureTable = self.featureTable else {
                 print("Feature table not available")
@@ -120,7 +121,7 @@ class POIModel {
             
             let result = try await featureTable.queryFeatures(using: query, queryFeatureFields: .loadAll)
             
-            // Check if task was cancelled after query
+            /// Check if task was cancelled after query
             guard !Task.isCancelled else {
                 print("POI query was cancelled after completion")
                 return
@@ -128,7 +129,7 @@ class POIModel {
             
             let features = Array(result.features()).compactMap { $0 as? ArcGISFeature }
             
-            // Update POIs on main thread
+            /// Update POIs on main thread
             await MainActor.run {
                 self.POIs.removeAll()
                 self.POIs = features

@@ -5,6 +5,9 @@
 //  Created by Jon Guler on 08.05.2025.
 //
 
+/// **Class Functions**
+/// Is used to keep data persistant across the differen objects and classes
+
 import CoreData
 
 class PersistenceController {

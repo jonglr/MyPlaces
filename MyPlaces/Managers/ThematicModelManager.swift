@@ -34,8 +34,8 @@ class ThematicModelManager {
             let output = try model.prediction(input: input)
             
             /// Convert the integer output to the corresponding theme string
-            let themeIndex = Int(output.themeLabel) // Assuming themeLabel is a number
-            return themeLookup[themeIndex] ?? "explore" // Return "explore" as fallback
+            let themeIndex = Int(output.themeLabel) /// Assuming themeLabel is a number
+            return themeLookup[themeIndex] ?? "explore" /// Return "explore" as fallback
             
         } catch {
             print("Failed to predict theme: \(error.localizedDescription)")

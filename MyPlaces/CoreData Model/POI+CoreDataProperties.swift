@@ -22,7 +22,6 @@ extension POI {
 
 }
 
-// MARK: Generated accessors for relevance
 extension POI {
 
     @objc(addRelevanceObject:)
