@@ -38,7 +38,7 @@ def assign_theme(time_h, dow, env):
     meal_times = [(8, 1.5), (12.5, 1.8), (19, 2)]  # (peak_hour, std_dev)
     for peak, std in meal_times:
         meal_score = math.exp(-0.5 * ((time_h - peak) / std) ** 2)
-        scores['food'] += meal_score * 1.8
+        scores['food'] += meal_score * 1.75
 
     # Commute patterns (weekdays only)
     if dow < 5:
