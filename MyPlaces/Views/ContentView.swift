@@ -216,8 +216,8 @@ struct ContentView: View {
                 map: map,
                 graphicsOverlays: [model.graphicsOverlay]
             )
-            .locationDisplay(locationDisplay)
-
+                .locationDisplay(locationDisplay)
+            
             // 1) Tap gesture
             let withTap = baseMap
                 .onSingleTapGesture { screenPoint, _ in
@@ -232,7 +232,7 @@ struct ContentView: View {
                         }
                     }
                 }
-
+            
             // 2) Start location display
             let withStartTask = withTap
                 .task {
@@ -248,7 +248,7 @@ struct ContentView: View {
                         self.failedToStart = true
                     }
                 }
-
+            
             // 3) Identify layers on tap
             let withIdentifyTask = withStartTask
                 .task(id: identifyScreenPoint) {
@@ -258,7 +258,7 @@ struct ContentView: View {
                             tolerance: 10,
                             returnPopupsOnly: true
                           ) else { return }
-
+                    
                     if let resultPopup = identifyResult.first?.popups.first {
                         self.popup = resultPopup
                         self.showPopupSheet = self.popup != nil
@@ -268,16 +268,16 @@ struct ContentView: View {
                         }
                     }
                 }
-
+            
             // 4) Alert on failure
             let withAlert = withIdentifyTask
                 .alert("Location display failed to start", isPresented: $failedToStart) {}
-
+            
             // 5) Switch Day/Night mode
             let withDayNight = withAlert
                 .onChange(of: settingsManager.isNightMode) {
                     print("Switching to \(settingsManager.isNightMode ? "night" : "day") mode")
-
+                    
                     DispatchQueue.main.async {
                         if settingsManager.isNightMode {
                             let nightItem = PortalItem(
@@ -296,7 +296,7 @@ struct ContentView: View {
                         }
                     }
                 }
-
+            
             // 6) React to POI updates
             let withPOIReceive = withDayNight
                 .onReceive(viewModel.$displayedPOIs) { newPOIs in
@@ -304,24 +304,24 @@ struct ContentView: View {
                     layerUpdateTask = Task {
                         try? await Task.sleep(nanoseconds: 300_000_000) // debounce 0.3s
                         guard !Task.isCancelled else { return }
-
+                        
                         let ids: [Int64] = newPOIs.compactMap {
                             if let fid = $0.attributes["fid"] as? NSNumber {
                                 return fid.int64Value
                             }
                             return nil
                         }
-
+                        
                         let idString = ids.map { String($0) }.joined(separator: ",")
                         let definitionExpression = "fid IN (\(idString))"
-
+                        
                         let portalItem = PortalItem(
                             portal: .arcGISOnline(connection: .authenticated),
                             id: Item.ID("586c7f50dbb949188b69a3fa0e1a236d")!
                         )
                         let filteredLayer = FeatureLayer(item: portalItem)
                         filteredLayer.definitionExpression = definitionExpression
-
+                        
                         await MainActor.run {
                             for layer in map.operationalLayers {
                                 if let fl = layer as? FeatureLayer,
@@ -334,7 +334,7 @@ struct ContentView: View {
                         }
                     }
                 }
-
+            
             // 7) Handle navigate-to-POI notifications for the favorites saved and clicked in the panel overlay
             let withNavigateReceive = withPOIReceive
                 .onReceive(NotificationCenter.default.publisher(for: .navigateToPOI)) { notification in
@@ -343,12 +343,22 @@ struct ContentView: View {
                         Task {
                             await viewModel.ensurePOIVisible(feature)
                             await proxy.setViewpointCenter(geometry, scale: 800)
-
-                            // Present the popup directly for this feature instead of simulating a tap
-                            await MainActor.run {
-                                self.popup = Popup(geoElement: feature)
-                                self.showPopupSheet = true
-                                viewModel.recordPOIClick(poi: feature)
+                            
+                            /// Simulate a tap on the location of the POI
+                            let screenPoint = proxy.screenPoint(fromLocation: geometry)
+                            if let identifyResult = try? await proxy.identifyLayers(
+                                screenPoint: screenPoint ?? .init(x: 0, y: 0),
+                                tolerance: 10,
+                                returnPopupsOnly: true
+                            ),
+                               let resultPopup = identifyResult.first?.popups.first {
+                                await MainActor.run {
+                                    self.popup = resultPopup
+                                    self.showPopupSheet = true
+                                    if let identifiedFeature = resultPopup.geoElement as? ArcGISFeature {
+                                        viewModel.recordPOIClick(poi: identifiedFeature)
+                                    }
+                                }
                             }
                         }
                     }
