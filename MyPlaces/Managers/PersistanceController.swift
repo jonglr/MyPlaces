@@ -6,7 +6,7 @@
 //
 
 /// **Class Functions**
-/// Is used to keep data persistant across the differen objects and classes
+/// Is used to keep data persistant across the differen objects and classes. This is the Core Data stack manager that handles the fundamental database infrastructure for the application
 
 import CoreData
 
