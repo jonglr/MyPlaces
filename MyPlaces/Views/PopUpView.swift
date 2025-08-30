@@ -6,7 +6,7 @@
 //
 
 /// **Class Functions**
-
+/// Is responsible for the Pop-Up View when a POI Feature is clicked to shop up with a custom design and the favorite symbol
 
 import SwiftUI
 import ArcGIS
@@ -26,7 +26,6 @@ struct CustomPopupView: View {
                 customHeader(for: feature)
                     .padding(.horizontal)
                     .padding(.top)
-                
             }
             
             // Original PopupView

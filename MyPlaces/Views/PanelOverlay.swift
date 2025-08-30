@@ -6,6 +6,7 @@
 //
 
 /// **Class Functions**
+/// Shows the saved favorites of a user in the UI and handles the user Switching and Profile
 
 
 import SwiftUI
@@ -318,7 +319,6 @@ struct FavoritesPanel: View {
         let userFavoriteScores = dataManager.getUserFavorites()
         print("Found \(userFavoriteScores.count) favorites for current user")
         
-        // Map to display model
         var favorites: [FavoritePOI] = []
         for score in userFavoriteScores {
             if let poiID = score.poiID,

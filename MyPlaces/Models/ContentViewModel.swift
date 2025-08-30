@@ -88,6 +88,10 @@ class ContentViewModel: NSObject, ObservableObject {
         
         Task { @MainActor in
             await initializePOIModel()
+            let cacheSuccess = await variableManager.refreshCachedData()
+            if !cacheSuccess {
+                print("Warning: Could not refresh cache before theme prediction")
+            }
             await updateTheme()
             await updateRelevance()
             await loadRelevanceScores()
@@ -289,13 +293,18 @@ class ContentViewModel: NSObject, ObservableObject {
         }
     }
     
-    /// Update theme and notify UI on main thread
+    /// Update theme and notify the UI
     private func updateTheme() async {
+        // Ensure we have environment data before predicting
+        let environment = await variableManager.getCachedEnvironment()
+        
         let predictedTheme = thematicModelManager.predictTheme(
             timeOfDay: variableManager.currentTimeOfDay(),
             dayOfWeek: variableManager.currentDay(),
-            environmentType: await variableManager.currentEnvironment()
+            environmentType: environment  // Use the cached value
         )
+        
+        print("Predicting theme with environment: \(environment)")
         
         await MainActor.run {
             // Save the newly predicted theme
@@ -446,6 +455,9 @@ class ContentViewModel: NSObject, ObservableObject {
         relevanceUpdateTask?.cancel()
         await relevanceUpdateTask?.value
         
+        // Invalidate cache when location changes
+        variableManager.invalidateCache()
+        
         // Determine the location to use
         let locationPoint: Point
         if let searchPoint = newLocation {
@@ -504,6 +516,12 @@ class ContentViewModel: NSObject, ObservableObject {
         
         // Start relevance calculation
         relevanceUpdateTask = Task {
+            guard !Task.isCancelled else { return }
+            let cacheSuccess = await variableManager.refreshCachedData()
+            if !cacheSuccess {
+                print("Warning: Cache refresh failed at new location")
+            }
+            
             guard !Task.isCancelled else { return }
             await updateTheme()
             

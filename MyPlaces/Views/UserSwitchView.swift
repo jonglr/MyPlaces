@@ -6,6 +6,7 @@
 //
 
 /// **Class Functions**
+/// The UI View when the user wants to select another profile or delete a profile
 
 import SwiftUI
 import CoreData

@@ -28,17 +28,17 @@ def assign_theme(time_h, dow, env):
     env_multipliers = {
         0: {'shopping': 1.5, 'food': 1.2, 'public transport': 1.8, 'culture': 1.3, 'outdoor': 0.3, 'explore': 0.5},
         1: {'shopping': 0.8, 'food': 1.0, 'public transport': 0.5, 'culture': 0.7, 'outdoor': 1.2, 'explore': 1.3},
-        2: {'shopping': 0.2, 'food': 0.6, 'public transport': 0.1, 'culture': 0.4, 'outdoor': 2.0, 'explore': 1.8},
+        2: {'shopping': 0.2, 'food': 0.6, 'public transport': 0.1, 'culture': 0.4, 'outdoor': 2.3, 'explore': 1.8},
     }
 
     for theme in THEMES:
         scores[theme] = env_multipliers[env].get(theme, 0.5)
 
     # Meal times with Gaussian peaks
-    meal_times = [(8, 1.5), (12.5, 2), (19, 2)]  # (peak_hour, std_dev)
+    meal_times = [(8, 1.5), (12.5, 1.8), (19, 2)]  # (peak_hour, std_dev)
     for peak, std in meal_times:
         meal_score = math.exp(-0.5 * ((time_h - peak) / std) ** 2)
-        scores['food'] += meal_score * 2.0
+        scores['food'] += meal_score * 1.8
 
     # Commute patterns (weekdays only)
     if dow < 5:
@@ -50,8 +50,8 @@ def assign_theme(time_h, dow, env):
     if dow < 5:  # Weekday evening shopping
         if 17 <= time_h <= 20:
             scores['shopping'] += 1.2
-    else:  # Weekend shopping
-        if 10 <= time_h <= 16:
+    else:  # Saturday shopping
+        if dow < 6 and 9 <= time_h <= 16:
             scores['shopping'] += 1.5
 
     # Culture/entertainment
