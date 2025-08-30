@@ -82,12 +82,10 @@ struct FavoritesPanel: View {
         }
         /// Receiver when a new POI is added to the favorites
         .onReceive(NotificationCenter.default.publisher(for: .favoritesDidChange)) { _ in
-            print("Favorites changed notification received")
             loadFavorites()
         }
         /// Receiver when there was a user switch externally
         .onReceive(NotificationCenter.default.publisher(for: .userDidChange)) { _ in
-            print("User changed notification received")
             /// Clear current favorites immediately
             favoritePOIs = []
             /// Reload favorites of the new user after a short delay to ensure data is ready
@@ -381,7 +379,6 @@ struct FavoritesPanel: View {
                     }
                 }
                 self.favoritePOIs = favorites.sorted { $0.name < $1.name }
-                print("Displayed \(favoritePOIs.count) of \(userFavoriteScores.count) favorites")
             }
         }
     }

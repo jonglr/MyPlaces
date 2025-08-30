@@ -385,7 +385,6 @@ class ContentViewModel: NSObject, ObservableObject {
         
         /// If all POIs are found -> end function
         if missingFIDs.isEmpty {
-            print("All favorites already loaded")
             return
         }
         
@@ -704,11 +703,9 @@ class ContentViewModel: NSObject, ObservableObject {
         
         /// Ensure all required components are initialized
         guard poiModel != nil else {
-            print("POI model not initialized yet, skipping location update")
             return
         }
         guard dataManager.currentUser() != nil else {
-            print("No current user, skipping location update")
             return
         }
         
