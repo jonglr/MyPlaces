@@ -245,9 +245,10 @@ class ContentViewModel: NSObject, ObservableObject {
                 /// get the attributes for the score computation ot the poi
                 let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
                 let otherTags = poi.attributes["other_tags"] as? String ?? ""
-                let (open, hasOpeningHours) = variableManager.isOpen(otherTags: otherTags)
+                let (open, _) = variableManager.isOpen(otherTags: otherTags)
                 let distance = variableManager.calculateDistanceToUser(origin: poi)
-                let hasName = variableManager.hasName(poi: poi)
+                let clusterScore = poi.attributes["cluster_score"] as! Double
+                let colocationScore = poi.attributes["colocation_score"] as! Double
                 
                 /// compute the relevance Score using cached values
                 let score = relevanceModelManager.predictRelevance(
@@ -260,8 +261,8 @@ class ContentViewModel: NSObject, ObservableObject {
                     lastClickedDate: daysAgo,
                     theme: currentTheme,
                     fclass: fclass,
-                    hasName: hasName,
-                    hasOpeningHours: hasOpeningHours
+                    clusterScore: clusterScore,
+                    colocationScore: colocationScore
                 )
                 /// Simple main thread dispatch
                 await MainActor.run {

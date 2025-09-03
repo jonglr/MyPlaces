@@ -15,7 +15,7 @@ df_relevance = pd.read_csv('synthetic_relevance.csv')
 # Derive distinct id counts for theme / fclass
 feature_cols = [
     "distance", "speed", "weather", "isOpen", "favorite",
-    "clickCount", "lastClickedDate", "theme", "fclass", "hasName", "hasOpeningHours"
+    "clickCount", "lastClickedDate", "theme", "fclass", "cluster_score", "colocation_score"
 ]
 X_relevance = df_relevance[feature_cols]
 Y_relevance = df_relevance['interestScore']
@@ -47,8 +47,8 @@ monotone_constraints = {
     6: 0,   # lastClickedDate: complex relationship
     7: 0,   # theme: categorical, no monotonicity
     8: 0,   # fclass: categorical, no monotonicity
-    9: 1,   # hasName: having name -> higher score
-    10: 1,  # hasOpeningHours: having hours -> higher score
+    9: 1,   # clusterScore: in a cluster -> higher score
+    10: 1,  # colocationScore: having high score already -> higher score
 }
 
 # Convert to the format XGBoost expects (tuple of constraints in feature order)

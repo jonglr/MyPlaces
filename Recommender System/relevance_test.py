@@ -40,19 +40,19 @@ def evaluate_under_noise(df_clean, noise_level, model, rule_func):
             click_count=int(row["clickCount"]),
             last_clicked_date=last_clicked_dt,
             theme=theme_str,
-            has_name=row["hasName"],
-            has_opening_hours=row["hasOpeningHours"],
-            fclass = fclass_str
+            fclass=fclass_str,
+            cluster_score=row["cluster_score"],
+            colocation_score=row["colocation_score"]
         )
         rule_pred.append(rule)
 
         # ML model prediction
         model_input = [[row["distance"], row["speed"], row["weather"], row["isOpen"], row["favorite"],
-                        row["clickCount"], row["lastClickedDate"], row["theme"], row["fclass"], row["hasName"], row["hasOpeningHours"]]]
+                        row["clickCount"], row["lastClickedDate"], row["theme"], row["fclass"], row["cluster_score"], row["colocation_score"]]]
         pred = model.predict(model_input)[0]
         model_pred.append(pred)
 
-    # For regression, use MSE instead of accuracy
+    # For regression, use MSE
     rule_mse = mean_squared_error(y_true, rule_pred)
     model_mse = mean_squared_error(y_true, model_pred)
 
@@ -75,7 +75,7 @@ for noise in noise_levels:
         df_test,
         noise,
         relevance_model.best_model,
-        relevance.compute_interest_score
+        relevance.compute_cpl_relevance_score
     )
     rule_performances.append(rule_perf)
     model_performances.append(model_perf)

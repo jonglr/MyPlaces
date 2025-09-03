@@ -31,8 +31,8 @@ class RelevanceModelManager {
         lastClickedDate: Double,
         theme: Double,
         fclass: Double,
-        hasName: Double,
-        hasOpeningHours: Double
+        clusterScore: Double,
+        colocationScore: Double
     )
     -> Double {
         let input = RelevanceInput(
@@ -45,8 +45,8 @@ class RelevanceModelManager {
             lastClickedDate: lastClickedDate,
             theme: theme,
             fclass: fclass,
-            hasName: hasName,
-            hasOpeningHours: hasOpeningHours
+            cluster_score: clusterScore,
+            colocation_score: colocationScore
         )
         
         do {

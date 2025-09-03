@@ -453,15 +453,6 @@ class VariableManager {
         return (isFavorite, clickCount, daysAgo)
     }
     
-    /// Returns the information if the POI has a name stored (for filtering and efficient data fetching)
-    func hasName (poi: Feature) -> Double {
-        let name = poi.attributes["name"]
-        if name != nil {
-            return 1.0
-        }
-        return 0.0
-    }
-    
     
     // MARK: - Search Conversion
 
