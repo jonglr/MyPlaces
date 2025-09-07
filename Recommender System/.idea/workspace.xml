@@ -5,18 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="3026e421-7b4e-4157-99a0-0bf879726700" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../MyPlaces/Managers/RelevanceModelManager.swift" beforeDir="false" afterPath="$PROJECT_DIR$/../MyPlaces/Managers/RelevanceModelManager.swift" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../MyPlaces/Managers/VariableManager.swift" beforeDir="false" afterPath="$PROJECT_DIR$/../MyPlaces/Managers/VariableManager.swift" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../MyPlaces/Models/ContentViewModel.swift" beforeDir="false" afterPath="$PROJECT_DIR$/../MyPlaces/Models/ContentViewModel.swift" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../MyPlaces/Resources/Relevance.mlmodel" beforeDir="false" afterPath="$PROJECT_DIR$/../MyPlaces/Resources/Relevance.mlmodel" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../MyPlaces/Resources/Thematic.mlmodel" beforeDir="false" afterPath="$PROJECT_DIR$/../MyPlaces/Resources/Thematic.mlmodel" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/poi_relevance.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/relevance.py" beforeDir="false" afterPath="$PROJECT_DIR$/relevance.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relevance_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/relevance_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relevance_noise.py" beforeDir="false" afterPath="$PROJECT_DIR$/relevance_noise.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/relevance_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/relevance_test.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/synthetic_relevance.csv" beforeDir="false" afterPath="$PROJECT_DIR$/synthetic_relevance.csv" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/synthetic_thematic.csv" beforeDir="false" afterPath="$PROJECT_DIR$/synthetic_thematic.csv" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/thematic.png" beforeDir="false" afterPath="$PROJECT_DIR$/thematic.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/thematic.py" beforeDir="false" afterPath="$PROJECT_DIR$/thematic.py" afterDir="false" />
@@ -230,6 +219,8 @@
       <workItem from="1756813425899" duration="52037000" />
       <workItem from="1756915024178" duration="4327000" />
       <workItem from="1756923262347" duration="820000" />
+      <workItem from="1757079572435" duration="137000" />
+      <workItem from="1757237372968" duration="2572000" />
     </task>
     <servers />
   </component>
@@ -241,7 +232,7 @@
     <SUITE FILE_PATH="coverage/Recommender_System$relevance.coverage" NAME="relevance Coverage Results" MODIFIED="1756916242184" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/Recommender_System$distance_test.coverage" NAME="distance_test Coverage Results" MODIFIED="1756918958433" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/Recommender_System$geographc_context.coverage" NAME="geographc_context Coverage Results" MODIFIED="1756806374207" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/Recommender_System$thematic_test.coverage" NAME="thematic_test Coverage Results" MODIFIED="1756923573548" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/Recommender_System$thematic_test.coverage" NAME="thematic_test Coverage Results" MODIFIED="1757239690044" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/Recommender_System$relevance_cpl.coverage" NAME="relevance_cpl Coverage Results" MODIFIED="1756909654848" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/Recommender_System$thematic_model.coverage" NAME="thematic_model Coverage Results" MODIFIED="1756919051252" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/Recommender_System$geographic_context.coverage" NAME="geographic_context Coverage Results" MODIFIED="1756813615123" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
@@ -249,6 +240,6 @@
     <SUITE FILE_PATH="coverage/Recommender_System$relevance_model.coverage" NAME="relevance_model Coverage Results" MODIFIED="1756909996217" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/Recommender_System$relevance_test.coverage" NAME="relevance_test Coverage Results" MODIFIED="1756922099353" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/Recommender_System$relevance_noise.coverage" NAME="relevance_noise Coverage Results" MODIFIED="1756210713302" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/Recommender_System$thematic.coverage" NAME="thematic Coverage Results" MODIFIED="1756923547442" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/Recommender_System$thematic.coverage" NAME="thematic Coverage Results" MODIFIED="1757239681542" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
