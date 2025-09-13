@@ -60,7 +60,7 @@ class VariableManager {
         let timestamp: Date
         
         var isValid: Bool {
-            // Cache is valid for 15s
+            /// Cache is valid for 15s
             return Date().timeIntervalSince(timestamp) < 15
         }
     }
@@ -439,18 +439,27 @@ class VariableManager {
     func getPOIDetails(poiID: UUID) -> (isFavorite: Double, clickCount: Double, daysAgo: Double) {
         let (fav,click,days) = DataManager.shared.getPOIInteraction(poiID: poiID, context: context)
         /// convert them into Double values for the model calculation
-        let isFavorite: Double
-        if fav {isFavorite = 1.0}
-        else {isFavorite = 0.0}
+        let isFavorite: Double = fav ? 1.0 : 0.0
         let clickCount: Double = Double(click)
         /// current date and time
         let now = Date()
+        let daysAgo: Double
         /// Calculate the amount of days difference and then safely convert it into a Double datatype
-        let calendar = Calendar.current
-        let components = calendar.dateComponents([.day], from: days, to: now)
-        let daysAgo = Double(components.day ?? 0)
-        
-        return (isFavorite, clickCount, daysAgo)
+        if days == Date.distantPast || days < Date(timeIntervalSinceNow: -365 * 24 * 60 * 60) {
+            daysAgo = 365.0
+        } else {
+            let calendar = Calendar.current
+            let components = calendar.dateComponents([.day], from: days, to: now)
+            daysAgo = Double(min(components.day ?? 0, 600))  /// Cap at 600 days
+        }
+        let adjustedDaysAgo: Double
+        if fav && daysAgo > 30 {
+            /// Favorites should appear recently interacted with
+            adjustedDaysAgo = 7.0  /// Pretend it was clicked a week ago
+        } else {
+            adjustedDaysAgo = daysAgo
+        }
+        return (isFavorite, clickCount, adjustedDaysAgo)
     }
     
     

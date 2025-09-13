@@ -39,65 +39,71 @@ class GeographicProcessor:
         
         print(f"Loaded {len(self.fclass_mapping)} fclass types")
         print(f"Non-clustering types: {len(self.non_clustering_fclasses)}")
-        
+
+        # Store the path for co-location rules
+        self.colocation_rules_path = 'co-location_rules_high_quality.csv'
+
         # Generate co-location rules
         self.colocation_rules = self._generate_comprehensive_rules()
 
     # Generate comprehensive co-location rules based on urban planning logic
     def _generate_comprehensive_rules(self):
         rules = []
-        
-        # Define logical co-location patterns
-        patterns = [
-            # Accommodation needs services
-            ('hotel', ['restaurant', 'cafe', 'atm', 'taxi', 'bar']),
-            ('hostel', ['restaurant', 'supermarket', 'atm']),
-            ('motel', ['restaurant', 'fast_food', 'atm']),
-            
-            # Food establishments cluster together
-            ('restaurant', ['bar', 'cafe', 'atm', 'taxi']),
-            ('fast_food', ['convenience', 'atm']),
-            ('cafe', ['bakery', 'restaurant']),
-            ('bar', ['restaurant', 'nightclub', 'fast_food']),
-            
-            # Shopping areas
-            ('supermarket', ['atm', 'pharmacy', 'bakery', 'convenience']),
-            ('mall', ['restaurant', 'cafe', 'cinema', 'atm']),
-            ('department_store', ['cafe', 'restaurant', 'atm']),
-            
-            # Transport hubs
-            ('railway_station', ['taxi', 'bus_stop', 'cafe', 'kiosk', 'atm']),
-            ('bus_station', ['taxi', 'kiosk', 'convenience']),
-            ('bus_stop', ['kiosk', 'convenience']),
-            
-            # Tourist areas
-            ('museum', ['cafe', 'restaurant', 'gift_shop', 'tourist_info']),
-            ('attraction', ['restaurant', 'cafe', 'souvenir', 'hotel']),
-            ('monument', ['cafe', 'tourist_info']),
-            ('castle', ['restaurant', 'cafe', 'gift_shop']),
-            
-            # Education
-            ('university', ['library', 'cafe', 'bookshop', 'copy_shop']),
-            ('school', ['stationery', 'bookshop']),
-            
-            # Healthcare (even though they don't cluster themselves)
-            ('hospital', ['pharmacy', 'cafe', 'florist']),
-            ('clinic', ['pharmacy']),
-            
-            # Entertainment
-            ('cinema', ['restaurant', 'bar', 'fast_food']),
-            ('theatre', ['restaurant', 'bar', 'cafe']),
-            ('nightclub', ['bar', 'fast_food', 'taxi']),
-        ]
-        
-        # Convert patterns to rules
-        for premise, conclusions in patterns:
-            for conclusion in conclusions:
-                # Only add if both types exist in our mapping
-                if premise in self.fclass_mapping and conclusion in self.fclass_mapping:
-                    rules.append({'premise': premise, 'conclusion': conclusion})
-        
-        print(f"Generated {len(rules)} co-location rules")
+
+        try:
+            print(f"Loading co-location rules from {self.colocation_rules_path}...")
+
+            # Read the CSV file
+            rules_df = pd.read_csv(self.colocation_rules_path)
+
+            # Filter rules based on quality metrics
+            min_support = 0.3  # At least 30% support
+            min_lift = 1.5  # At least 1.5x more likely than random
+            min_score = 0.1  # Minimum combined score
+
+            # Apply filters
+            filtered_rules = rules_df[
+                (rules_df['support'] >= min_support) &
+                (rules_df['lift'] >= min_lift) &
+                (rules_df['score'] >= min_score)
+                ]
+
+            # Convert to rule format expected by the rest of the code
+            for _, row in filtered_rules.iterrows():
+                # Check if both premise and conclusion exist in fclass mapping
+                if (row['premise'] in self.fclass_mapping and
+                        row['conclusion'] in self.fclass_mapping):
+                    rules.append({
+                        'premise': row['premise'],
+                        'conclusion': row['conclusion'],
+                        'support': row['support'],
+                        'confidence': row['confidence'],
+                        'lift': row['lift'],
+                        'score': row['score']
+                    })
+
+            print(f"Loaded {len(rules)} co-location rules from CSV")
+            print(f"  (filtered from {len(rules_df)} total rules)")
+
+            # Show some statistics about loaded rules
+            if rules:
+                premises = set(r['premise'] for r in rules)
+                conclusions = set(r['conclusion'] for r in rules)
+                print(f"  Unique premises: {len(premises)}")
+                print(f"  Unique conclusions: {len(conclusions)}")
+
+                # Show top 5 rules by score
+                top_rules = sorted(rules, key=lambda x: x['score'], reverse=True)[:5]
+                print("\n  Top 5 rules by score:")
+                for r in top_rules:
+                    print(f"    {r['premise']} → {r['conclusion']} (score: {r['score']:.3f})")
+
+            return rules
+
+        except Exception as e:
+            print(f"Error loading rules from CSV: {e}")
+
+        print(f"Generated {len(rules)} fallback co-location rules")
         return rules
 
     # Convert meters to degrees at given latitude
@@ -192,78 +198,82 @@ class GeographicProcessor:
                 features_df.loc[original_idx, 'cluster_score'] = min(score, 1.0)
         
         return features_df
-    
+
     def compute_colocation_score(self, features_df):
         print("Computing co-location scores ...")
         features_df['colocation_score'] = 0.0
-        
+
         # Build spatial index for all POIs
         all_coords = features_df[['x', 'y']].values
         all_tree = spatial.KDTree(all_coords)
-        
+
         # Process each POI
         for idx in tqdm(features_df.index, desc="Processing co-locations"):
             poi = features_df.loc[idx]
             poi_type = poi['fclass']
             poi_coord = np.array([poi['x'], poi['y']])
-            
+
             # Find applicable rules
-            applicable_rules = [r for r in self.colocation_rules 
-                               if r['premise'] == poi_type]
-            
+            applicable_rules = [r for r in self.colocation_rules
+                                if r['premise'] == poi_type]
+
             if not applicable_rules:
                 continue
-            
+
             # Find all neighbors within 200m
             radius_degrees = self.colocation_dist_m
             neighbor_indices = all_tree.query_ball_point(poi_coord, radius_degrees)
             neighbor_indices = [i for i in neighbor_indices if i != idx]  # Exclude self
-            
+
             if not neighbor_indices:
                 continue
-            
+
             neighbors = features_df.iloc[neighbor_indices]
-            
+
             # Evaluate each rule
             rule_scores = []
             for rule in applicable_rules:
                 conclusion_type = rule['conclusion']
                 conclusion_neighbors = neighbors[neighbors['fclass'] == conclusion_type]
-                
+
                 if len(conclusion_neighbors) == 0:
                     continue
-                
+
                 # Calculate distances to conclusion type POIs
                 conclusion_coords = conclusion_neighbors[['x', 'y']].values
-                distances = np.sqrt(np.sum((conclusion_coords - poi_coord)**2, axis=1))
+                distances = np.sqrt(np.sum((conclusion_coords - poi_coord) ** 2, axis=1))
                 distances_m = distances
-                
+
                 # Prevalence: how many conclusion POIs are nearby
                 prevalence = len(conclusion_neighbors) / max(len(neighbors), 1)
-                
+
                 # Conditional probability: proximity-weighted
                 min_dist = distances_m.min()
                 proximity_score = np.exp(-min_dist / self.colocation_dist_m)
-                
-                # Check thresholds
+
+                # Use the rule's inherent quality metrics to weight the score
+                rule_weight = rule.get('score', 0.5)
+                rule_lift = rule.get('lift', 1.0)
+
+                # Check thresholds with rule-specific adjustments
                 if prevalence >= self.prevalence_threshold:
-                    # Strong co-location pattern
-                    rule_score = min(prevalence + proximity_score * 0.5, 1.0)
+                    # Strong co-location pattern, weighted by rule quality
+                    rule_score = min((prevalence + proximity_score * 0.5) * rule_weight * min(rule_lift / 2, 1.5), 1.0)
                 elif proximity_score >= self.conditional_prob_threshold:
-                    # Proximity-based co-location
-                    rule_score = proximity_score * 0.7
+                    # Proximity-based co-location, weighted by rule quality
+                    rule_score = proximity_score * 0.7 * rule_weight
                 else:
                     rule_score = 0.0
-                
+
                 if rule_score > 0:
                     rule_scores.append(rule_score)
-            
+
             # Aggregate rule scores
             if rule_scores:
                 # Use mean of top 3 rules (avoid dilution from many weak rules)
                 top_scores = sorted(rule_scores, reverse=True)[:3]
                 features_df.loc[idx, 'colocation_score'] = np.mean(top_scores)
-        
+
         return features_df
     
     def process(self, sample_size=None, prevent_sleep=True):
@@ -322,9 +332,7 @@ class GeographicProcessor:
             features_df = self.compute_colocation_score(features_df)
             
             # Statistics
-            print("\n" + "="*60)
             print("SCORE STATISTICS:")
-            print("-"*60)
             
             # Cluster scores
             cluster_stats = features_df['cluster_score'].describe()
@@ -355,9 +363,7 @@ class GeographicProcessor:
             print(f"  Non-zero: {(features_df['colocation_score'] > 0).sum()} / {len(features_df)}")
             
             # Examples of high-scoring POIs
-            print("\n" + "="*60)
             print("TOP SCORING POIS:")
-            print("-"*60)
             
             top_cluster = features_df.nlargest(5, 'cluster_score')[['fclass', 'name', 'cluster_score']]
             print("\nTop 5 Cluster Scores:")
@@ -372,7 +378,6 @@ class GeographicProcessor:
                 print(f"  {row['fclass']:20s} | {name:30s} | {row['colocation_score']:.3f}")
             
             # Update feature layer
-            print("\n" + "="*60)
             print("Updating ArcGIS Feature Layer...")
             self.update_feature_layer(features_df)
             
@@ -385,7 +390,6 @@ class GeographicProcessor:
             
             # Timing
             total_time = time.time() - start_time
-            print(f"\n" + "="*60)
             print(f"PROCESSING COMPLETE!")
             print(f"Total time: {total_time/60:.1f} minutes")
             print(f"Average time per feature: {total_time/len(features_df):.3f} seconds")
@@ -418,7 +422,7 @@ class GeographicProcessor:
 
         print(f"Updated {done}/{total} features successfully")
 
-        output_file = f"scores_{len(features_df)}_features.csv"
+        output_file = f"scores_features.csv"
         features_df[['fid', 'fclass', 'name', 'cluster_score', 'colocation_score']].to_csv(output_file, index=False)
         print(f"Results saved to {output_file}")
 
@@ -433,13 +437,11 @@ with open(swift_file_path, 'r') as file:
     # Pattern looks for: static let AGOLpassword = "value"
     pattern = r'static\s+let\s+AGOLpassword\s*=\s*"([^"]*)"'
     match = re.search(pattern, content)
-    passwords = match.group(1)
+    password = match.group(1)
 
 # Usage
 if __name__ == "__main__":
-    print("="*60)
     print("Attribute Calculator")
-    print("="*60)
     
     # Connect to ArcGIS
     gis = GIS("https://www.arcgis.com", username="jonglr", password=password)

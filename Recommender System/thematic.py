@@ -28,44 +28,44 @@ def assign_theme(time_h, dow, env):
 
     # Food timing ------------------------------------------------------------------------------------------------------
     if dow < 5:
-            food_peaks = [(8.5, 1.2), (12.5, 1.4), (20.0, 2.0)]
+            food_peaks = [(8, 1.3), (12.0, 1.6), (19.0, 2.0)]
     else:  # weekend: even later social dinners
-            food_peaks = [(9.0, 1.2), (13.5, 1.4), (20.5, 2.2)]
+            food_peaks = [(9.0, 1.3), (12.5, 1.6), (20.0, 2.5)]
 
     for peak, std in food_peaks:
-        meal_score = math.exp(-0.5 * ((time_h - peak) / std) ** 2)
+        meal_score = 2 * math.exp(-0.5 * ((time_h - peak) / (std * 0.6)) ** 2)
         scores['food'] += meal_score
 
     # Rural/Urban weekend market mornings (food + shopping bump)
     if env in (1, 2) and dow >= 5 and 8 <= time_h <= 12:
-        scores['food'] += 0.6
+        scores['food'] += 0.5
         scores['shopping'] += 0.8
 
     # Public transport / commute patterns ------------------------------------------------------------------------------
     # Urban commute peaks strong; rural much weaker and shorter
     commute_morning = math.exp(-0.5 * ((time_h - 8) / (1.0 if env == 0 else 0.8)) ** 2)
     commute_evening = math.exp(-0.5 * ((time_h - 18) / (1.5 if env == 0 else 1.0)) ** 2)
-    pt_scale = 1.6 if env == 0 else 0.5  # rural travels less & uses PT less
+    pt_scale = 1.2 if env == 0 else 0.6  # rural travels less & uses PT less
     scores['public transport'] += (commute_morning + commute_evening) * pt_scale
 
     # Shopping patterns ------------------------------------------------------------------------------------------------
     # Weekday evening shopping windows
     if dow < 5 and 15 <= time_h <= 19:
-        scores['shopping'] += 1.3
+        scores['shopping'] += 1.4
     # Saturday shopping patterns
     if dow == 5:
         if 9 <= time_h <= 16:
-            scores['shopping'] += 1.3
+            scores['shopping'] += 1.4
 
     # Culture & leisure ------------------------------------------------------------------------------------------------
     if dow >= 5: # Weekend
-        scores['culture'] += 1.2
-    if time_h >= 18: # Evening
-        scores['culture'] += 0.8
+        scores['culture'] += 1.0
+    elif time_h >= 20: # Evening
+        scores['culture'] += 1.0
 
     # Outdoor activities (higher in rural & nature; weekend peak) ------------------------------------------------------
     daylight_factor = math.exp(-0.5 * ((time_h - 14) / 4) ** 2)  # peak early afternoon
-    base_outdoor = 1.8 if env in (1, 2) else 0.7
+    base_outdoor = 1.8 if env == 2 else 0.8
     weekend_boost = 1.2 if dow >= 5 else (0.8 if env in (1, 2) else 0.5)
     scores['outdoor'] += daylight_factor * base_outdoor * weekend_boost
 

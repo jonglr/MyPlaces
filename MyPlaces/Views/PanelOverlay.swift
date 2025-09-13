@@ -75,8 +75,8 @@ struct FavoritesPanel: View {
         .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: isExpanded)
         .onAppear {
             Task {
-                /// 3 second delay to load the favorites into the panel to ensure the neccessary models are initialized and data loaded
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                /// 5 second delay to load the favorites into the panel to ensure the neccessary models are initialized and data loaded
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
                 loadFavorites()
             }
         }

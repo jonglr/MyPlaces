@@ -37,6 +37,7 @@ struct ContentView: View {
     @State private var map: Map
     private let basemap_day: Basemap
     private let basemap_night: Basemap
+    private let basemap_outdoor: Basemap
     private let irrelevantPOIs: FeatureLayer
     
     /// Variables for the location display & related states
@@ -67,7 +68,6 @@ struct ContentView: View {
     @State private var showFavoritesPanel = true
     @State private var favoritesPanelOffset: CGFloat = 0
     
-    
     // MARK: - Initialization
 
     
@@ -82,13 +82,21 @@ struct ContentView: View {
             portal: .arcGISOnline(connection: .authenticated),
             id: Item.ID("f2ac67c0a5564cdc90f29585354e6163")!
         )
+        /// Import the Basemap for Outdoor
+        let basemapItemOutdoor = PortalItem(
+            portal: .arcGISOnline(connection: .authenticated),
+            id: Item.ID("6bac1b93f52d4bce95c1236dd37c7d2b")!
+        )
         /// Convert the two items into Baseaps
         let vtl_basemap_day = ArcGISVectorTiledLayer(item: basemapItemDay)
         let vtl_basemap_night = ArcGISVectorTiledLayer(item: basemapItemNight)
+        let vtl_basemap_outdoor = ArcGISVectorTiledLayer(item: basemapItemOutdoor)
         let basemap_day = Basemap(baseLayers: [vtl_basemap_day])
         let basemap_night = Basemap(baseLayers: [vtl_basemap_night])
+        let basemap_outdoor = Basemap(baseLayers: [vtl_basemap_outdoor])
         self.basemap_day = basemap_day
         self.basemap_night = basemap_night
+        self.basemap_outdoor = basemap_outdoor
         
         /// Import the irrelevant POI (grey points)
         let initialMap = Map(basemap: basemap_day)
@@ -101,7 +109,6 @@ struct ContentView: View {
         
         /// Assign the map state variable
         self._map = State(initialValue: initialMap)
-
     }
     
     /// Possible themes for the theme picker element
@@ -132,7 +139,12 @@ struct ContentView: View {
                         
                         /// UI overlays
                         VStack {
-                            searchAndTogglesOverlay(proxy: proxy)  // Pass proxy here
+                            searchAndTogglesOverlay(proxy: proxy)  /// Pass proxy here
+                            
+                            /// #if DEBUG
+                            /// BenchmarkTriggerView().environmentObject(viewModel)
+                            /// #endif
+                            
                             Spacer()
                             HStack {
                                 Spacer()
@@ -291,8 +303,8 @@ struct ContentView: View {
                 .onReceive(viewModel.$displayedPOIs) { newPOIs in
                     layerUpdateTask?.cancel()
                     layerUpdateTask = Task {
-                        /// debounce 0.3s
-                        try? await Task.sleep(nanoseconds: 300_000_000)
+                        /// debounce 0.1s
+                        try? await Task.sleep(nanoseconds: 100_000_000)
                         guard !Task.isCancelled else { return }
                         
                         let ids: [Int64] = newPOIs.compactMap {
@@ -361,10 +373,29 @@ struct ContentView: View {
                         await viewModel.updateRelevance()
                         await viewModel.loadRelevanceScores()
                     }
+                    /// Change the basemap to the outdoor basemap if this theme is selected
+                    DispatchQueue.main.async {
+                        switch settingsManager.theme {
+                        case "outdoor":
+                            map.basemap = basemap_outdoor
+                        default:
+                            map.basemap = settingsManager.isNightMode ? basemap_night : basemap_day
+                        }
+                    }
                 }
 
             /// Return the staged view
-            withThemeChange
+            let withTimeBasedTheme = withThemeChange
+                .task {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000) /// delay 1.5s
+                    let hour = Calendar.current.component(.hour, from: Date())
+                    let isNightTime = hour < 8 || hour > 19
+                    await MainActor.run {
+                        settingsManager.isNightMode = isNightTime   /// If its before sunrise or after sunset, the app should automatically switch between day/nightmode
+                    }
+                }
+
+            return withTimeBasedTheme
         }
     }
     
@@ -422,7 +453,7 @@ struct ContentView: View {
                     .padding(8)
                     .background(.regularMaterial)
                     .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.2), radius: 30, x: 0, y: 1)
+                    .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 1)
                     .onAppear {
                         /// Load effective theme from Core Data
                         let state = DataManager.shared.fetchThemeState()

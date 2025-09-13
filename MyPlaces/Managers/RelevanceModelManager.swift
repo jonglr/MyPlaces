@@ -51,6 +51,9 @@ class RelevanceModelManager {
         
         do {
             let output = try model.prediction(input: input)
+            if favorite == 1.0 {
+                return output.interestScore + 0.5   /// boost the favorites to make sure they show up
+            }
             return output.interestScore
         } catch {
             print("Error predicting relevance: \(error.localizedDescription)")

@@ -39,7 +39,7 @@ class ContentViewModel: NSObject, ObservableObject {
     private let dataManager = DataManager.shared
     
     /// All POI Storage (temporarely) before the relevant ones get published in order to get displayed
-    private var allPOIs: [ArcGISFeature] = []
+    var allPOIs: [ArcGISFeature] = []
     /// Relevant POIs that get overlayed onto the rest of the POIs
     @Published var displayedPOIs: [ArcGISFeature] = []
     /// Favorite POI Cache that are outside normal loading area
@@ -58,7 +58,7 @@ class ContentViewModel: NSObject, ObservableObject {
     
     /// Aggregation control properties
     @Published var currentMapScale: Double = 1500 /// Default scale
-    private var lastAggregationScale: Double = 0
+    var lastAggregationScale: Double = 0
     private var aggregationTask: Task<Void, Never>?
     private var unfilteredRelevantPOIs: [ArcGISFeature] = [] /// Store POIs before aggregation
     /// Threshold for scale change to trigger re-aggregation
@@ -136,12 +136,11 @@ class ContentViewModel: NSObject, ObservableObject {
             
             /// Get current user theme
             let currentTheme = variableManager.currentUserTheme()
-            let themeClasses = getFclassesForTheme(currentTheme)
-            
-            /// Filter POIs that have relevance scores > 0.5
+        
+            /// Filter POIs that have relevance scores > 0.4
             let relevantPOIs = allPOIs.compactMap { poi -> (poi: ArcGISFeature, score: Double, fclass: Double)? in
                 let score = getRelevanceScore(for: poi)
-                guard score > 0.4 else { return nil }
+                guard score > 0.5 else { return nil }
                 
                 /// Get fclass for thematic filtering
                 guard let fclassRaw = poi.attributes["fclass"] as? String,
@@ -151,29 +150,8 @@ class ContentViewModel: NSObject, ObservableObject {
                 return (poi: poi, score: score, fclass: fclass)
             }
             
-            /// Separate POIs into themed and non-themed groups
-            let themedPOIs = relevantPOIs.filter { themeClasses.isEmpty || themeClasses.contains($0.fclass) }
-            let nonThemedPOIs = relevantPOIs.filter { !themeClasses.isEmpty && !themeClasses.contains($0.fclass) }
-            
-            /// Sort both groups by relevance score (highest first)
-            let sortedThemedPOIs = themedPOIs.sorted { $0.score > $1.score }
-            let sortedNonThemedPOIs = nonThemedPOIs.sorted { $0.score > $1.score }
-            
-            /// Calculate balanced counts - use themed POI count as the limit
-            let availableThemedCount = sortedThemedPOIs.count
-            let availableDiscoveryCount = sortedNonThemedPOIs.count
-            
-            /// Take all available themed POIs
-            let selectedThemedPOIs = sortedThemedPOIs
-            
-            /// Take same number of discovery POIs as themed POIs (or all if fewer available)
-            let discoveryTargetCount = min(availableThemedCount, availableDiscoveryCount)
-            let selectedDiscoveryPOIs = Array(sortedNonThemedPOIs.prefix(discoveryTargetCount))
-            
             /// Combine all POIs and store them for re-aggregation
-            self.unfilteredRelevantPOIs = (selectedThemedPOIs + selectedDiscoveryPOIs).map { $0.poi }
-            
-            print("Themed POIs: \(selectedThemedPOIs.count), Discovery POIs: \(selectedDiscoveryPOIs.count)")
+            self.unfilteredRelevantPOIs = (relevantPOIs).map { $0.poi }
             print("Total POIs before aggregation: \(unfilteredRelevantPOIs.count)")
             
             /// Apply initial aggregation with current scale
@@ -186,18 +164,23 @@ class ContentViewModel: NSObject, ObservableObject {
     /// Helper function to get relevance score for a POI
     func getRelevanceScore(for poi: ArcGISFeature) -> Double {
         guard let user = dataManager.currentUser(),
+              let userID = user.userID,
               let fidAny = poi.attributes["fid"],
               let fid = (fidAny as? NSNumber)?.int64Value else { return 0.0 }
         
         let poiID = variableManager.uuidFromFID(fid)
-        
         let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
-        request.predicate = NSPredicate(format: "user == %@ AND poiID == %@", user, poiID as CVarArg)
-        
+        request.predicate = NSPredicate(
+            format: "userID == %@ AND poiID == %@", 
+            userID as CVarArg,
+            poiID as CVarArg
+        )
         do {
             let scores = try context.fetch(request)
-                    let score = scores.first?.score ?? 0.0
-                    return score
+            if let score = scores.first?.score {
+                return score
+            }
+            return 0.0
         } catch {
             print("Error fetching relevance score: \(error)")
             return 0.0
@@ -294,7 +277,7 @@ class ContentViewModel: NSObject, ObservableObject {
     }
     
     /// Update theme and notify the UI
-    private func updateTheme() async {
+    func updateTheme() async {
         /// Ensure that there is environment data available before predicting the theme
         let environment = await variableManager.getCachedEnvironment()
         
@@ -454,7 +437,7 @@ class ContentViewModel: NSObject, ObservableObject {
     
     /// POI reloading for a specific location
     @MainActor
-    private func reloadPOIsForLocation(_ location: Point) async {
+    func reloadPOIsForLocation(_ location: Point) async {
         guard let poiModel = self.poiModel else {
             print("POI model not available for reloading")
             return
@@ -494,7 +477,7 @@ class ContentViewModel: NSObject, ObservableObject {
                 displayedPOIs = updatedPOIs
                 
                 /// Ensure it has a high relevance score so it shows up
-                dataManager.saveRelevanceScore(for: poiID, score: 0.9, fid: fid )
+                dataManager.saveRelevanceScore(for: poiID, score: 1.0, fid: fid )
             }
         }
     }
@@ -505,24 +488,30 @@ class ContentViewModel: NSObject, ObservableObject {
     
     private func getAggregationThreshold(for scale: Double) -> Double {
         switch scale {
-        case 0..<500:
-            return 3.0     /// Very close: 3m
+            case 0..<200:
+            return 10.0
+        case 200..<500:
+            return 15.0
+        case 500..<800:
+            return 20.0
+        case 800..<1000:
+            return 25.0
         case 500..<1500:
-            return 10.0    /// Close: 10m
+            return 30.0
         case 1500..<3000:
-            return 20.0    /// Medium close: 20m
+            return 50.0
         case 3000..<8000:
-            return 40.0    /// Medium: 40m
+            return 80.0
         case 8000..<20000:
-            return 100.0    /// Medium far: 80m
+            return 100.0
         case 20000..<50000:
-            return 200.0   /// Far: 150m
+            return 200.0
         case 50000..<100000:
-            return 400.0   /// Very far: 300m
+            return 400.0
         case 100000..<500000:
-            return 1000.0  /// City level: 1km
+            return 1000.0
         default:
-            return 2000.0  /// Region level: 2km
+            return 2000.0
         }
     }
     
@@ -542,9 +531,9 @@ class ContentViewModel: NSObject, ObservableObject {
         /// Cancel any pending aggregation
         aggregationTask?.cancel()
         
-        /// Debounce: wait 300ms before aggregating
+        /// Debounce: wait 100ms before aggregating
         aggregationTask = Task {
-            try? await Task.sleep(nanoseconds: 300_000_000) /// 0.3 seconds
+            try? await Task.sleep(nanoseconds: 100_000_000) /// 0.1 seconds
             
             guard !Task.isCancelled else { return }
             
@@ -590,7 +579,7 @@ class ContentViewModel: NSObject, ObservableObject {
         /// Get current user theme and corresponding fclasses for boosting
         let currentTheme = variableManager.currentUserTheme()
         let themeClasses = getFclassesForTheme(currentTheme)
-        let themeBoost = 0.5 /// Thematic Boost in percentage
+        let themeBoost = 50.0 /// Thematic Boost in percentage
         
         for poi in pois {
             guard let fidAny = poi.attributes["fid"],

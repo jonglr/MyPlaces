@@ -176,7 +176,7 @@ importance_df = pd.DataFrame({
 
 for _, row in importance_df.iterrows():
     bar = "█" * int(row['importance'] * 30)
-    print(f"  {row['feature']:15} {row['importance']:.3f} {bar}")
+    print(f"  {row['feature']:15}     {row['importance']:.3f} {bar}")
 
 # 7) Convert to Core ML ------------------------------------------------------------------------
 

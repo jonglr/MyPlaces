@@ -124,7 +124,7 @@ class CPLRelevanceScorer:
 
         # Step 3: Make behavioural signal mandatory by AND-ing it with the mandatory block
         # First combine the two mandatory components (already computed above) with behaviour
-        mandatory_combined = self.gcd(mandatory_combined, behaviour_p, self.alpha)
+        mandatory_combined = self.gcd(mandatory_combined, behaviour_p, 0.85)
 
         # Step 4: Combine cluster and co-location into geographic environment (desired)
         # Using partial conjunction as in the paper
@@ -170,26 +170,24 @@ def calculate_base_probabilities(
     weather_factors = {
         1: 1.0,  # Sunny - normal
         2: 0.7,  # Cloudy - slightly reduced
-        3: 0.5  # Rainy - significantly reduced
+        3: 0.3  # Rainy - significantly reduced
     }
     base_distance *= weather_factors.get(weather, 1.0)
 
     # Gaussian decay: e^(-0.5 * (distance / sigma)^2)
     # sigma controls the spread
     sigma = base_distance
-    distance_p = max(0.01, math.exp(-0.5 * (distance / sigma) ** 2))  # Never go below 0.01
+    distance_p = max(0.0, math.exp(-0.5 * (distance / sigma) ** 2))  # Never go below 0
 
     # 3. Temporal probability ------------------------------------------------------------------------------------------
-    temporal_p = 0.5 if is_open == 1 else 0.25
+    temporal_p = 0.6 if is_open == 1 else 0.1
 
     # 4. Behavioral probability ----------------------------------------------------------------------------------------
-    favorite_p = 0.50 if favorite == 1 else 0.0
+    favorite_p = 1.0 if favorite == 1 else 0.3
     days_ago = (datetime.now() - last_clicked_date).days
     click_rate = click_count / (days_ago + 1.0)
     click_p = 1 - math.exp(-click_rate / 5.0)
-    behaviour_base = max(favorite_p, click_p)
-    # Soft floor to avoid killing the mandatory path when signals are weak
-    behaviour_p = 0.2 + 0.8 * behaviour_base
+    behaviour_p = max(favorite_p, click_p)
     
     return {
         'semantic_p': semantic_p,
@@ -288,18 +286,19 @@ def generate_dataset(num_samples):
     cluster_scores = []
     colocation_scores = []
     for _ in range(num_samples):
-        if random.random() < 0.3:
-            # 30% have very low scores (isolated POIs)
-            cluster_scores.append(round(random.uniform(0, 0.3), 3))
-            colocation_scores.append(round(random.uniform(0, 0.3), 3))
-        elif random.random() < 0.6:
-            # 30% have very high scores (clustered POIs)
-            cluster_scores.append(round(random.uniform(0.7, 1.0), 3))
-            colocation_scores.append(round(random.uniform(0.7, 1.0), 3))
+        rand = random.random()
+        if rand < 0.4:
+            # 40% have low scores (isolated POIs)
+            cluster_scores.append(round(random.uniform(0.1, 0.4), 3))
+            colocation_scores.append(round(random.uniform(0.1, 0.4), 3))
+        elif rand < 0.55:
+            # 15% have high scores (highly clustered POIs like pharmacies)
+            cluster_scores.append(round(random.uniform(0.6, 0.8), 3))  # Reduced from 0.7-1.0
+            colocation_scores.append(round(random.uniform(0.6, 0.8), 3))
         else:
-            # 40% have medium scores
-            cluster_scores.append(round(random.uniform(0.3, 0.7), 3))
-            colocation_scores.append(round(random.uniform(0.3, 0.7), 3))
+            # 45% have medium scores (majority of POIs)
+            cluster_scores.append(round(random.uniform(0.3, 0.6), 3))
+            colocation_scores.append(round(random.uniform(0.3, 0.6), 3))
 
     is_open = [] # correlated with time/theme
     themes = [random.choice(possible_themes) for _ in range(num_samples)]
@@ -347,7 +346,7 @@ def generate_dataset(num_samples):
 
         last_clicked_date = now - timedelta(days=days_in_past)
         last_clicked_dates.append(last_clicked_date)
-        last_clicked_timestamps.append(int(last_clicked_date.timestamp()))
+        last_clicked_timestamps.append((now - last_clicked_date).days)
 
     themes = [random.choice(possible_themes) for _ in range(num_samples)]
     fclasses = [random.choice(all_fclasses_list) for _ in range(num_samples)]
@@ -378,7 +377,7 @@ def generate_dataset(num_samples):
         'isOpen': is_open,
         'favorite': favorites,
         'clickCount': click_counts,
-        'lastClickedDate': last_clicked_timestamps,  # Store as Unix timestamp
+        'lastClickedDate': last_clicked_timestamps,
         'theme': [theme_to_id[theme] for theme in themes],  # Convert to numeric
         'fclass': [fclass_to_id[fclass] for fclass in fclasses],  # Convert to numeric
         'cluster_score': cluster_scores,
@@ -389,5 +388,5 @@ def generate_dataset(num_samples):
     return df
 
 # Save the main datasets
-df_main = generate_dataset(6000)
+df_main = generate_dataset(5000)
 df_main.to_csv('synthetic_relevance.csv', index=False)

@@ -92,7 +92,7 @@ class POIModel {
         guard let point = userPoint else { return }
         
         /// Create a bounding box around the location
-        let buffer: Double = 0.0225 /// ~2.5km buffer in degrees
+        let buffer: Double = 0.009  /// buffer in degrees (fetch limit of 2000)
         let envelope = Envelope(
             xMin: point.x - buffer,
             yMin: point.y - buffer,
@@ -112,7 +112,13 @@ class POIModel {
             let query = QueryParameters()
             query.geometry = envelope
             query.spatialRelationship = .intersects
-            query.whereClause = "name IS NOT NULL AND name <> ''" /// filter out unneccessary POI fetching of incomplete POIs to make the app more efficient
+            query.whereClause = """
+            name IS NOT NULL AND name <> '' AND fclass NOT IN (
+                'atm', 'vending_any', 'vending_parking', 'vending_machine', 'vending_cigarette',
+                'telephone', 'recycling_metal', 'recycling_paper', 'recycling', 'recycling_glass',
+                'recycling_clothes', 'waste_basket', 'drinking_water', 'water_well'
+            )
+            """ /// filter out unneccessary POI fetching of incomplete POIs to make the app more efficient
             
             guard let featureTable = self.featureTable else {
                 print("Feature table not available")

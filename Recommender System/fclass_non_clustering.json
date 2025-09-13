@@ -1,5 +1,11 @@
 [
   "hospital",
+  "bus_station",
+  "bus_stop",
+  "railway_halt",
+  "railway_station",
+  "tram_stop",
+  "taxi",
   "clinic",
   "doctors",
   "dentist",

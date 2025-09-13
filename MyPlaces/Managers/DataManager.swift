@@ -164,7 +164,7 @@ class DataManager: ObservableObject {
             let existingScores = try context.fetch(fetchRequest)
             
             if let existingScore = existingScores.first {
-                /// Update existing score but PRESERVE all interaction data
+                /// Update existing score
                 existingScore.score = score
                 existingScore.fid = fid
             } else {
@@ -190,24 +190,26 @@ class DataManager: ObservableObject {
     
     /// Check if a POI is marked as favorite by the current user
     func isUserFavorite(poiID: UUID) -> Bool {
-        guard let user = currentUser() else { return false }
+        guard let user = currentUser(),
+              let userID = user.userID else { return false }
         
         let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
         request.predicate = NSPredicate(
-            format: "user == %@ AND poiID == %@ AND isFavorite == true",
-            user,
+            format: "userID == %@ AND poiID == %@ AND isFavorite == true",
+            userID as CVarArg,
             poiID as CVarArg
         )
         request.fetchLimit = 1
         
         do {
-            return try context.count(for: request) > 0
+            let count = try context.count(for: request)
+            return count > 0
         } catch {
             print("Error checking user favorite: \(error)")
             return false
         }
     }
-    
+
     /// Set favorite status for a POI for the current user
     func setUserFavorite(poiID: UUID, isFavorite: Bool, fid: Int64) {
         guard let user = currentUser(),
@@ -260,11 +262,6 @@ class DataManager: ObservableObject {
             /// Set the user-specific favorite flag
             relevanceScore.isFavorite = isFavorite
             
-            /// If marking as favorite, boost the relevance score
-            if isFavorite && relevanceScore.score < 0.8 {
-                relevanceScore.score = 0.8  // Boost score for favorites
-            }
-            
             try context.save()
             
             /// Post notification for UI updates
@@ -279,17 +276,21 @@ class DataManager: ObservableObject {
     
     /// Get all favorite POIs for current user
     func getUserFavorites() -> [RelevanceScore] {
-        guard let user = currentUser() else { return [] }
+        guard let user = currentUser(),
+              let userID = user.userID else { return [] }
         
         let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
+        
         request.predicate = NSPredicate(
-            format: "user == %@ AND isFavorite == true",
-            user
+            format: "userID == %@ AND isFavorite == true",
+            userID as CVarArg
         )
         request.sortDescriptors = [NSSortDescriptor(key: "score", ascending: false)]
         
         do {
-            return try context.fetch(request)
+            let favorites = try context.fetch(request)
+            print("User \(user.name ?? "?"): Found \(favorites.count) favorites")
+            return favorites
         } catch {
             print("Error fetching user favorites: \(error)")
             return []
@@ -397,14 +398,6 @@ class DataManager: ObservableObject {
             /// Update user-specific interaction data
             relevanceScore.clickCount += 1
             relevanceScore.lastClickedDate = Date()
-            
-            /// Handle favorite if specified
-            if let isFavorite = isFavorite {
-                relevanceScore.isFavorite = isFavorite
-                if isFavorite && relevanceScore.score < 0.8 {
-                    relevanceScore.score = 0.8  /// Boost score for favorites
-                }
-            }
             
             try context.save()
             print("Updated interaction for user \(user.name ?? "Unknown"): POI \(poiID), clicks: \(relevanceScore.clickCount)")

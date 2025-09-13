@@ -3,6 +3,141 @@
 <plist version="1.0">
 <dict>
 	<key>top-level-items</key>
-	<array/>
+	<array>
+		<dict>
+			<key>destination</key>
+			<dict>
+				<key>location-parameters</key>
+				<dict>
+					<key>EndingColumnNumber</key>
+					<string>0</string>
+					<key>EndingLineNumber</key>
+					<string>143</string>
+					<key>StartingColumnNumber</key>
+					<string>0</string>
+					<key>StartingLineNumber</key>
+					<string>142</string>
+					<key>Timestamp</key>
+					<string>779371667.366666</string>
+				</dict>
+				<key>rebasable-url</key>
+				<dict>
+					<key>base</key>
+					<string>workspace</string>
+					<key>payload</key>
+					<dict>
+						<key>relative-path</key>
+						<string>MyPlaces/Models/ContentViewModel.swift</string>
+					</dict>
+				</dict>
+			</dict>
+			<key>text-context</key>
+			<dict>
+				<key>focused</key>
+				<string>                guard score &gt; 0.5 else { return nil }
+</string>
+				<key>leading</key>
+				<string>            let relevantPOIs = allPOIs.compactMap { poi -&gt; (poi: ArcGISFeature, score: Double, fclass: Double)? in
+                let score = getRelevanceScore(for: poi)
+</string>
+				<key>trailing</key>
+				<string>                
+                /// Get fclass for thematic filtering
+                guard let fclassRaw = poi.attributes["fclass"] as? String,
+</string>
+			</dict>
+			<key>type</key>
+			<string>bookmark</string>
+		</dict>
+		<dict>
+			<key>destination</key>
+			<dict>
+				<key>location-parameters</key>
+				<dict>
+					<key>EndingColumnNumber</key>
+					<string>29</string>
+					<key>EndingLineNumber</key>
+					<string>54</string>
+					<key>StartingColumnNumber</key>
+					<string>23</string>
+					<key>StartingLineNumber</key>
+					<string>54</string>
+					<key>Timestamp</key>
+					<string>779368790.01858</string>
+				</dict>
+				<key>rebasable-url</key>
+				<dict>
+					<key>base</key>
+					<string>workspace</string>
+					<key>payload</key>
+					<dict>
+						<key>relative-path</key>
+						<string>MyPlaces/Managers/RelevanceModelManager.swift</string>
+					</dict>
+				</dict>
+			</dict>
+			<key>text-context</key>
+			<dict>
+				<key>focused</key>
+				<string>output</string>
+				<key>leading</key>
+				<string>            let output = try model.prediction(input: input)
+            if favorite == 1.0 {
+                return </string>
+				<key>trailing</key>
+				<string>.interestScore + 0.5   /// boost the favorites to make sure they show up
+            }
+            return output.interestScore
+</string>
+			</dict>
+			<key>type</key>
+			<string>bookmark</string>
+		</dict>
+		<dict>
+			<key>destination</key>
+			<dict>
+				<key>location-parameters</key>
+				<dict>
+					<key>EndingColumnNumber</key>
+					<string>0</string>
+					<key>EndingLineNumber</key>
+					<string>489</string>
+					<key>StartingColumnNumber</key>
+					<string>0</string>
+					<key>StartingLineNumber</key>
+					<string>488</string>
+					<key>Timestamp</key>
+					<string>779371667.366645</string>
+				</dict>
+				<key>rebasable-url</key>
+				<dict>
+					<key>base</key>
+					<string>workspace</string>
+					<key>payload</key>
+					<dict>
+						<key>relative-path</key>
+						<string>MyPlaces/Models/ContentViewModel.swift</string>
+					</dict>
+				</dict>
+			</dict>
+			<key>text-context</key>
+			<dict>
+				<key>focused</key>
+				<string>    private func getAggregationThreshold(for scale: Double) -&gt; Double {
+</string>
+				<key>leading</key>
+				<string>    
+    
+</string>
+				<key>trailing</key>
+				<string>        switch scale {
+            case 0..&lt;200:
+            return 10.0
+</string>
+			</dict>
+			<key>type</key>
+			<string>bookmark</string>
+		</dict>
+	</array>
 </dict>
 </plist>
