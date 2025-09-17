@@ -23,7 +23,7 @@ struct OnboardingView: View {
         VStack(spacing: 20) {
             Spacer()
             
-            Text("Welcome to MyPlaces")
+            Text("Welcome")
                 .font(.largeTitle)
                 .fontWeight(.bold)
                 .padding()

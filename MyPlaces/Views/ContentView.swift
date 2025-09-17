@@ -483,7 +483,7 @@ struct ContentView: View {
     private var dayNightToggle: some View {
         ZStack {
             /// Background icons
-            HStack(spacing: 8) {
+            HStack(spacing: 16) {
                 Image(systemName: "sun.max.fill")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(settingsManager.isNightMode ? .secondary : .gray)
@@ -500,7 +500,7 @@ struct ContentView: View {
                 .offset(x: -1)
                 .toggleStyle(SwitchToggleStyle(tint: .clear))
         }
-        .frame(height: 38)
+        .frame(height: 32)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
         .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 1)

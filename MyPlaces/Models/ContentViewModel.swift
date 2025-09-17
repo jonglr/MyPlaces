@@ -137,7 +137,7 @@ class ContentViewModel: NSObject, ObservableObject {
             /// Get current user theme
             let currentTheme = variableManager.currentUserTheme()
         
-            /// Filter POIs that have relevance scores > 0.4
+            /// Filter POIs that have relevance scores > 0.5
             let relevantPOIs = allPOIs.compactMap { poi -> (poi: ArcGISFeature, score: Double, fclass: Double)? in
                 let score = getRelevanceScore(for: poi)
                 guard score > 0.5 else { return nil }
