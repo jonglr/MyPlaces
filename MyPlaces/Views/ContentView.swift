@@ -608,7 +608,7 @@ struct ContentView: View {
                 symbol.text = firstResult.label
                 
                 /// Recenter map to geocoded location
-                await proxy.setViewpointCenter(location, scale: 3000)
+                await proxy.setViewpointCenter(location, scale: 5000)
                 
                 /// Trigger POI reload with validated WGS84 coordinates
                 await handleSearchLocationChange(searchLocation: wgs84Location)
