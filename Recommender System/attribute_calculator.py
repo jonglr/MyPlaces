@@ -13,8 +13,7 @@ import re
 class GeographicProcessor:
     
     def __init__(self, feature_layer_url, gis_connection, 
-                 fclass_mapping_path='fclass_mapping.json',
-                 non_clustering_path='fclass_non_clustering.json'):
+                 fclass_mapping_path='fclass_mapping.json'):
 
         self.gis = gis_connection
         self.feature_layer = FeatureLayer(feature_layer_url)
@@ -22,10 +21,6 @@ class GeographicProcessor:
         # Load fclass mapping (should have 167 unique classes)
         with open(fclass_mapping_path, 'r') as f:
             self.fclass_mapping = json.load(f)
-        
-        # Load non-clustering fclasses (hospitals, pharmacies, etc.)
-        with open(non_clustering_path, 'r') as f:
-            self.non_clustering_fclasses = set(json.load(f))
         
         # Parameters
         self.cluster_eps_m = 100  # 100 meters for clustering
@@ -38,15 +33,14 @@ class GeographicProcessor:
         self.conditional_prob_threshold = 0.33  # α = 0.33 (33% probability)
         
         print(f"Loaded {len(self.fclass_mapping)} fclass types")
-        print(f"Non-clustering types: {len(self.non_clustering_fclasses)}")
 
         # Store the path for co-location rules
         self.colocation_rules_path = 'co-location_rules_high_quality.csv'
 
-        # Generate co-location rules
+        # Import co-location rules
         self.colocation_rules = self._generate_comprehensive_rules()
 
-    # Generate comprehensive co-location rules based on urban planning logic
+    # Import co-location rules
     def _generate_comprehensive_rules(self):
         rules = []
 
@@ -121,11 +115,6 @@ class GeographicProcessor:
         
         # Group by fclass
         for fclass in tqdm(features_df['fclass'].unique(), desc="Processing fclasses"):
-            # Check if this is a non-clustering type
-            if fclass in self.non_clustering_fclasses:
-                # Assign score of 1.0 to non-clustering amenities
-                features_df.loc[features_df['fclass'] == fclass, 'cluster_score'] = 1.0
-                continue
             
             # Get all POIs of this type
             fclass_mask = features_df['fclass'] == fclass
@@ -138,7 +127,7 @@ class GeographicProcessor:
             
             # Extract coordinates
             coords = fclass_pois[['x', 'y']].to_numpy(float)
-            
+
             # Run DBSCAN clustering
             if len(fclass_pois) >= self.min_samples:
                 clustering = DBSCAN(
@@ -146,11 +135,19 @@ class GeographicProcessor:
                     min_samples=self.min_samples,
                     metric='euclidean'
                 ).fit(coords)
-                
+
                 labels = clustering.labels_
+
+                # Find the largest cluster for this fclass (Φ^cat(g))
+                unique_labels = [l for l in set(labels) if l != -1]
+                if unique_labels:
+                    cluster_sizes = [np.sum(labels == l) for l in unique_labels]
+                    max_cluster_size = max(cluster_sizes)
+                else:
+                    max_cluster_size = 1  # No clusters found
             else:
-                # Not enough points for clustering
                 labels = np.array([-1] * len(fclass_pois))
+                max_cluster_size = 1
             
             # Calculate distance to nearest same-type neighbor
             if len(coords) > 1:
@@ -167,33 +164,35 @@ class GeographicProcessor:
             for idx, (label, dist_m) in enumerate(zip(labels, nearest_distances_m)):
                 score = 0.0
                 
-                # Component 1: Cluster membership
+                # Cardinality
                 if label != -1:  # Part of a cluster
-                    cluster_size = np.sum(labels == label)
-                    # Normalize by expected cluster size (use 10 as reasonable max)
-                    cluster_component = min(cluster_size / 10.0, 1.0)
+                    current_cluster_size = np.sum(labels == label)
+                    # Normalize by expected cluster size
+                    delta_clustcard = (max_cluster_size - current_cluster_size) / max_cluster_size
                 else:
-                    cluster_component = 0.0
-                
-                # Component 2: Distance decay function
+                    delta_clustcard = 1.0 # if not in cluster
+
+                # Distance
                 if dist_m < np.inf:
-                    # δ_ClustDist(q,g) with λ = 0.5
-                    if dist_m <= self.cluster_eps_m:
-                        # Within threshold: higher score for closer neighbors
-                        distance_component = np.exp(-self.lambda_param * dist_m / self.cluster_eps_m)
-                    else:
-                        # Beyond threshold: rapid decay
-                        distance_component = np.exp(-2 * dist_m / self.cluster_eps_m) * 0.5
+                    delta_clustdist = min(dist_m / self.cluster_eps_m, 1.0)
                 else:
-                    distance_component = 0.0
+                    delta_clustdist = 1.0
+
+                d_clustdist = np.exp(-self.lambda_param * delta_clustdist)
+                d_clustcard = 1 - delta_clustcard
                 
-                # Combine components (geometric mean)
-                if cluster_component > 0 and distance_component > 0:
-                    score = np.sqrt(cluster_component * distance_component)
+                # Combine components (euclidean distance)
+                f_clust = np.sqrt(d_clustdist**2 + d_clustcard**2) / np.sqrt(2)
+
+                # Final Score
+                if len(unique_labels) == 0:
+                    score = 1.0
+                elif label == -1 and delta_clustcard == 1:  # Not in cluster and alone
+                    score = 0.0
                 else:
-                    score = max(cluster_component, distance_component) * 0.5
-                
-                # Get original index and assign score
+                    score = f_clust
+
+                # Assign score
                 original_idx = fclass_pois.index[idx]
                 features_df.loc[original_idx, 'cluster_score'] = min(score, 1.0)
         
@@ -203,76 +202,90 @@ class GeographicProcessor:
         print("Computing co-location scores ...")
         features_df['colocation_score'] = 0.0
 
-        # Build spatial index for all POIs
+        # Precompute all coordinates and build KDTree
         all_coords = features_df[['x', 'y']].values
         all_tree = spatial.KDTree(all_coords)
 
-        # Process each POI
+        # Create a fast-access mapping from index to fclass
+        index_to_fclass = features_df['fclass'].values
+
+        # Pre-compute max cardinalities per rule
+        max_cardinalities = {}
+
+        for rule in self.colocation_rules:
+            premise_type = rule['premise']
+            conclusion_type = rule['conclusion']
+            max_card = 0
+
+            # Get indices of all premise-type POIs
+            premise_indices = features_df.index[features_df['fclass'] == premise_type].tolist()
+            conclusion_indices = set(features_df.index[features_df['fclass'] == conclusion_type].tolist())
+
+            for idx in premise_indices:
+                coord = all_coords[idx]
+                nearby_indices = all_tree.query_ball_point(coord, self.colocation_dist_m)
+
+                # Count how many nearby are of conclusion_type
+                count = sum(1 for i in nearby_indices if i in conclusion_indices)
+                max_card = max(max_card, count)
+
+            max_cardinalities[f"{premise_type}->{conclusion_type}"] = max_card
+
+        # Now compute scores for each POI
         for idx in tqdm(features_df.index, desc="Processing co-locations"):
             poi = features_df.loc[idx]
             poi_type = poi['fclass']
             poi_coord = np.array([poi['x'], poi['y']])
 
-            # Find applicable rules
-            applicable_rules = [r for r in self.colocation_rules
-                                if r['premise'] == poi_type]
+            applicable_rules = [r for r in self.colocation_rules if r['premise'] == poi_type]
 
             if not applicable_rules:
+                features_df.at[idx, 'colocation_score'] = 1.0
                 continue
 
-            # Find all neighbors within 200m
-            radius_degrees = self.colocation_dist_m
-            neighbor_indices = all_tree.query_ball_point(poi_coord, radius_degrees)
-            neighbor_indices = [i for i in neighbor_indices if i != idx]  # Exclude self
-
-            if not neighbor_indices:
-                continue
-
-            neighbors = features_df.iloc[neighbor_indices]
-
-            # Evaluate each rule
             rule_scores = []
+
+            # Find neighbors once
+            nearby_indices = all_tree.query_ball_point(poi_coord, self.colocation_dist_m)
+            nearby_coords = all_coords[nearby_indices]
+            nearby_fclasses = index_to_fclass[nearby_indices]
+
             for rule in applicable_rules:
                 conclusion_type = rule['conclusion']
-                conclusion_neighbors = neighbors[neighbors['fclass'] == conclusion_type]
+                rule_key = f"{poi_type}->{conclusion_type}"
+                max_card = max_cardinalities.get(rule_key, 1)
 
-                if len(conclusion_neighbors) == 0:
+                if max_card == 0:
                     continue
 
-                # Calculate distances to conclusion type POIs
-                conclusion_coords = conclusion_neighbors[['x', 'y']].values
-                distances = np.sqrt(np.sum((conclusion_coords - poi_coord) ** 2, axis=1))
-                distances_m = distances
+                # Filter only conclusion-type neighbors
+                matching_coords = nearby_coords[nearby_fclasses == conclusion_type]
 
-                # Prevalence: how many conclusion POIs are nearby
-                prevalence = len(conclusion_neighbors) / max(len(neighbors), 1)
+                card_psi_x = len(matching_coords)
 
-                # Conditional probability: proximity-weighted
-                min_dist = distances_m.min()
-                proximity_score = np.exp(-min_dist / self.colocation_dist_m)
-
-                # Use the rule's inherent quality metrics to weight the score
-                rule_weight = rule.get('score', 0.5)
-                rule_lift = rule.get('lift', 1.0)
-
-                # Check thresholds with rule-specific adjustments
-                if prevalence >= self.prevalence_threshold:
-                    # Strong co-location pattern, weighted by rule quality
-                    rule_score = min((prevalence + proximity_score * 0.5) * rule_weight * min(rule_lift / 2, 1.5), 1.0)
-                elif proximity_score >= self.conditional_prob_threshold:
-                    # Proximity-based co-location, weighted by rule quality
-                    rule_score = proximity_score * 0.7 * rule_weight
+                if card_psi_x > 0:
+                    # Compute distances and min
+                    dists = np.sqrt(np.sum((matching_coords - poi_coord) ** 2, axis=1))
+                    min_dist = dists.min()
+                    delta_coloc_dist = min_dist / self.colocation_dist_m
                 else:
-                    rule_score = 0.0
+                    delta_coloc_dist = 1.0
 
-                if rule_score > 0:
-                    rule_scores.append(rule_score)
+                delta_coloc_card = (max_card - card_psi_x) / max_card
 
-            # Aggregate rule scores
+                # Transform into scores
+                d_coloc_dist = np.exp(-self.lambda_param * delta_coloc_dist)
+                d_coloc_card = (1 / (1 + delta_coloc_card) - 0.5) * 2
+
+                # Combine via Euclidean
+                f_coloc_psi = np.sqrt(d_coloc_dist ** 2 + d_coloc_card ** 2) / np.sqrt(2)
+
+                rule_scores.append(f_coloc_psi)
+
             if rule_scores:
-                # Use mean of top 3 rules (avoid dilution from many weak rules)
-                top_scores = sorted(rule_scores, reverse=True)[:3]
-                features_df.loc[idx, 'colocation_score'] = np.mean(top_scores)
+                features_df.at[idx, 'colocation_score'] = np.mean(rule_scores)
+            else:
+                features_df.at[idx, 'colocation_score'] = 0.0
 
         return features_df
     
@@ -452,8 +465,7 @@ if __name__ == "__main__":
     processor = GeographicProcessor(
         feature_layer_url,
         gis,
-        fclass_mapping_path='fclass_mapping.json',
-        non_clustering_path='fclass_non_clustering.json'
+        fclass_mapping_path='fclass_mapping.json'
     )
     
     # Process

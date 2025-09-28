@@ -652,16 +652,16 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Esri/arcgis-maps-sdk-swift-toolkit";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 200.6.0;
+				kind = exactVersion;
+				version = 200.6.0;
 			};
 		};
 		21D97DF32D4793F000A4B1B8 /* XCRemoteSwiftPackageReference "arcgis-maps-sdk-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Esri/arcgis-maps-sdk-swift";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 200.6.0;
+				kind = exactVersion;
+				version = 200.6.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

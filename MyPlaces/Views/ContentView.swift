@@ -38,6 +38,8 @@ struct ContentView: View {
     private let basemap_day: Basemap
     private let basemap_night: Basemap
     private let basemap_outdoor: Basemap
+    private let basemap_food: Basemap
+    private let basemap_transportation: Basemap
     private let irrelevantPOIs: FeatureLayer
     
     /// Variables for the location display & related states
@@ -87,26 +89,64 @@ struct ContentView: View {
             portal: .arcGISOnline(connection: .authenticated),
             id: Item.ID("6bac1b93f52d4bce95c1236dd37c7d2b")!
         )
+        /// Import the Basemap for Food theme
+        let basemapItemFood = PortalItem(
+            portal: .arcGISOnline(connection: .authenticated),
+            id: Item.ID("0a53d2c24e534826aeade132eb948fd3")!
+        )
+        /// Import the Basemap for Transportation theme
+        let basemapItemTransportation = PortalItem(
+            portal: .arcGISOnline(connection: .authenticated),
+            id: Item.ID("64b707b03e774df88b1aa11aded5ae7d")!
+        )
         /// Convert the two items into Baseaps
         let vtl_basemap_day = ArcGISVectorTiledLayer(item: basemapItemDay)
         let vtl_basemap_night = ArcGISVectorTiledLayer(item: basemapItemNight)
         let vtl_basemap_outdoor = ArcGISVectorTiledLayer(item: basemapItemOutdoor)
+        let vtl_basemap_food = ArcGISVectorTiledLayer(item: basemapItemFood)
+        let vtl_basemap_transportation = ArcGISVectorTiledLayer(item: basemapItemTransportation)
+        
         let basemap_day = Basemap(baseLayers: [vtl_basemap_day])
         let basemap_night = Basemap(baseLayers: [vtl_basemap_night])
         let basemap_outdoor = Basemap(baseLayers: [vtl_basemap_outdoor])
+        let basemap_food = Basemap(baseLayers: [vtl_basemap_food])
+        let basemap_transportation = Basemap(baseLayers: [vtl_basemap_transportation])
+        
         self.basemap_day = basemap_day
         self.basemap_night = basemap_night
         self.basemap_outdoor = basemap_outdoor
+        self.basemap_food = basemap_food
+        self.basemap_transportation = basemap_transportation
         
+        /// Get the initial theme from DataManager/SettingsManager
+        let initialThemeState = DataManager.shared.fetchThemeState()
+        let initialTheme = initialThemeState.userTheme ?? initialThemeState.predictedTheme ?? "explore"
+            
+        /// Determine the initial basemap based on the theme
+        let initialBasemap: Basemap
+        switch initialTheme {
+        case "outdoor":
+            initialBasemap = basemap_outdoor
+        case "food":
+            initialBasemap = basemap_food
+        case "public transport":
+            initialBasemap = basemap_transportation
+        default:
+            /// Check if it should be night mode initially
+            let hour = Calendar.current.component(.hour, from: Date())
+            let isNightTime = hour < 8 || hour > 19
+            initialBasemap = isNightTime ? basemap_night : basemap_day
+        }
+            
         /// Import the irrelevant POI (grey points)
-        let initialMap = Map(basemap: basemap_day)
+        let initialMap = Map(basemap: initialBasemap)  // Use the determined basemap
         let irrelevantPOIItem = PortalItem(
             portal: .arcGISOnline(connection: .authenticated),
             id: Item.ID("e725091c0dba4234a420736052397e2b")!
         )
         self.irrelevantPOIs = FeatureLayer(item: irrelevantPOIItem)
         initialMap.addOperationalLayer(irrelevantPOIs)
-        
+            
         /// Assign the map state variable
         self._map = State(initialValue: initialMap)
     }
@@ -373,11 +413,15 @@ struct ContentView: View {
                         await viewModel.updateRelevance()
                         await viewModel.loadRelevanceScores()
                     }
-                    /// Change the basemap to the outdoor basemap if this theme is selected
+                    /// Change the basemap based on the selected theme
                     DispatchQueue.main.async {
                         switch settingsManager.theme {
                         case "outdoor":
                             map.basemap = basemap_outdoor
+                        case "food":
+                            map.basemap = basemap_food
+                        case "public transport":
+                            map.basemap = basemap_transportation
                         default:
                             map.basemap = settingsManager.isNightMode ? basemap_night : basemap_day
                         }

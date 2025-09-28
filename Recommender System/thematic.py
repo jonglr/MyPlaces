@@ -49,13 +49,23 @@ def assign_theme(time_h, dow, env):
     scores['public transport'] += (commute_morning + commute_evening) * pt_scale
 
     # Shopping patterns ------------------------------------------------------------------------------------------------
-    # Weekday evening shopping windows
-    if dow < 5 and 15 <= time_h <= 19:
-        scores['shopping'] += 1.4
-    # Saturday shopping patterns
-    if dow == 5:
-        if 9 <= time_h <= 16:
-            scores['shopping'] += 1.4
+    # Weekday shopping: lunch break (12-13) and evening peak (17-18)
+    if dow < 5:
+        # Lunch shopping peak (smaller)
+        lunch_shopping = 0.8 * math.exp(-0.5 * ((time_h - 12.5) / 1.2) ** 2)
+        # Evening shopping peak (larger)
+        evening_shopping = 1.4 * math.exp(-0.5 * ((time_h - 17) / 1.8) ** 2)
+        scores['shopping'] += lunch_shopping + evening_shopping
+
+    # Weekend shopping: morning-to-afternoon peak
+    if dow == 5:  # Saturday
+        # Main shopping window centered at 13:00 with wider spread
+        saturday_shopping = 1.6 * math.exp(-0.5 * ((time_h - 13) / 2.5) ** 2)
+        scores['shopping'] += saturday_shopping
+    elif dow == 6:  # Sunday
+        # Smaller Sunday shopping window (some shops closed)
+        sunday_shopping = 0.9 * math.exp(-0.5 * ((time_h - 11) / 2.0) ** 2)
+        scores['shopping'] += sunday_shopping
 
     # Culture & leisure ------------------------------------------------------------------------------------------------
     if dow >= 5: # Weekend

@@ -123,7 +123,8 @@ struct UserSwitcherView: View {
                                 Group {
                                     if isEditMode && usersToDelete.contains(user) {
                                         Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(.red)
+                                            .symbolRenderingMode(.palette)
+                                            .foregroundStyle(.white, .red)
                                             .font(.system(size: 24))
                                             .offset(x: 30, y: -30)
                                     }
@@ -332,12 +333,12 @@ struct UserProfileCard: View {
                 /// Active indicator
                 if isActive && !isEditMode {
                     Circle()
-                        .stroke(Color.green, lineWidth: 3)
+                        .stroke(Color.blue, lineWidth: 3)
                         .frame(width: 76, height: 76)
                     
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 20))
-                        .foregroundColor(.green)
+                        .foregroundColor(.blue)
                         .background(Circle().fill(Color.white))
                         .offset(x: 25, y: -25)
                 }
@@ -368,7 +369,7 @@ struct UserProfileCard: View {
             if isActive && !isEditMode {
                 Text("Active")
                     .font(.caption2)
-                    .foregroundColor(.green)
+                    .foregroundColor(.blue)
                     .fontWeight(.semibold)
             }
         }

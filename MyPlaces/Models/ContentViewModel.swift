@@ -668,7 +668,7 @@ class ContentViewModel: NSObject, ObservableObject {
         locationManager.requestWhenInUseAuthorization()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 50.0 // Update every 50m for monitoring
+        locationManager.distanceFilter = 5.0 /// Update every 5m for monitoring
     }
     
     /// Handle location changes from either user movement or search
