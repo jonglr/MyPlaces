@@ -52,7 +52,7 @@ class ContentViewModel: NSObject, ObservableObject {
     
     /// Throttling for location updates
     private var lastLocationUpdateTime: Date = Date(timeIntervalSince1970: 0)
-    private let locationUpdateThrottle: TimeInterval = 2.0 // Minimum 2 seconds between updates
+    private let locationUpdateThrottle: TimeInterval = 2.0 /// Minimum 2 seconds between updates
     private var currentSearchLocation: Point?
     private var relevanceUpdateTask: Task<Void, Never>?
     
@@ -247,9 +247,37 @@ class ContentViewModel: NSObject, ObservableObject {
                     clusterScore: clusterScore,
                     colocationScore: colocationScore
                 )
+                
+                /// Create dictionary with all the data
+                let relevanceAttributes: [String: Any] = [
+                    "distance": distance,
+                    "speed": currentSpeed,
+                    "weather": cachedWeather,
+                    "isOpen": open,
+                    "favorite": isFavorite,
+                    "clickCount": clickCount,
+                    "lastClickedDate": daysAgo,
+                    "theme": currentTheme,
+                    "fclass": fclass,
+                    "clusterScore": clusterScore,
+                    "colocationScore": colocationScore,
+                    "score": score,
+                    "timestamp": Date().timeIntervalSince1970
+                ]
+                
+                /// Convert to a JSON String for CoreData saving
+                let jsonData = try? JSONSerialization.data(withJSONObject: relevanceAttributes)
+                let jsonString = jsonData != nil ? String(data: jsonData!, encoding: .utf8) : nil
+                            
+                
                 /// Simple main thread dispatch
                 await MainActor.run {
-                    dataManager.saveRelevanceScore(for: poiID, score: score, fid: fid,)
+                    dataManager.saveRelevanceScore(
+                        for: poiID,
+                        score: score,
+                        fid: fid,
+                        relevanceData: jsonString
+                    )
                 }
             } else {
                 print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
@@ -485,33 +513,35 @@ class ContentViewModel: NSObject, ObservableObject {
     
     // MARK: - POI Aggregation
     
-    
+    /// Defines the cluster distance for the POI aggregation
     private func getAggregationThreshold(for scale: Double) -> Double {
         switch scale {
-            case 0..<200:
+        case 0..<200:
             return 10.0
         case 200..<500:
-            return 15.0
-        case 500..<800:
             return 20.0
-        case 800..<1000:
-            return 25.0
-        case 500..<1500:
-            return 30.0
-        case 1500..<3000:
-            return 50.0
-        case 3000..<8000:
+        case 500..<1000:
+            return 45.0
+        case 1000..<1600:
+            return 60.0
+        case 1600..<2000:
+            return 75.0
+        case 2000..<2500:
             return 80.0
-        case 8000..<20000:
+        case 2500..<3000:
             return 100.0
-        case 20000..<50000:
+        case 3000..<4000:
+            return 150.0
+        case 4000..<6000:
             return 200.0
-        case 50000..<100000:
+        case 6000..<10000:
+            return 300.0
+        case 10000..<15000:
             return 400.0
-        case 100000..<500000:
-            return 1000.0
+        case 15000..<30000:
+            return 500.0
         default:
-            return 2000.0
+            return 1000.0
         }
     }
     

@@ -124,7 +124,7 @@ class DataManager: ObservableObject {
     // MARK: - Relevance Score Management
     
     /// Update the existing Relevance Scores, Favorite variable and click data for the user
-    func saveRelevanceScore(for poiID: UUID, score: Double, fid: Int64) {
+    func saveRelevanceScore(for poiID: UUID, score: Double, fid: Int64, relevanceData: String? = nil) {
         guard let user = currentUser() else {
             print("No valid user found to save Relevance Score")
             return
@@ -167,12 +167,14 @@ class DataManager: ObservableObject {
                 /// Update existing score
                 existingScore.score = score
                 existingScore.fid = fid
+                existingScore.relevanceData = relevanceData
             } else {
                 let newScore = RelevanceScore(context: context)
                 newScore.userID = userID
                 newScore.poiID = poiID
                 newScore.fid = fid
                 newScore.score = score
+                newScore.relevanceData = relevanceData
                 newScore.isFavorite = false
                 newScore.clickCount = 0
                 newScore.lastClickedDate = nil

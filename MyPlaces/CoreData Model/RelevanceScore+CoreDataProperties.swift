@@ -25,6 +25,7 @@ extension RelevanceScore {
     @NSManaged public var lastClickedDate: Date?
     @NSManaged public var poi: POI?
     @NSManaged public var user: UserProfile?
+    @NSManaged public var relevanceData: String?
 
 }
 

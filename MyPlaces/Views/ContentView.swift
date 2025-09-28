@@ -181,9 +181,9 @@ struct ContentView: View {
                         VStack {
                             searchAndTogglesOverlay(proxy: proxy)  /// Pass proxy here
                             
-                            /// #if DEBUG
-                            /// BenchmarkTriggerView().environmentObject(viewModel)
-                            /// #endif
+                            #if DEBUG
+                            BenchmarkTriggerView().environmentObject(viewModel)
+                            #endif
                             
                             Spacer()
                             HStack {
@@ -215,7 +215,7 @@ struct ContentView: View {
         /// Relevance Score loading overlay display
         .loadingOverlay(
             isPresented: $viewModel.isComputingRelevance,
-            text: "Calculating relevance scores…"
+            text: "Loading Relevant Places…"
         )
         /// Popup Sheet
         .sheet(isPresented: $showPopupSheet) { [popup] in
