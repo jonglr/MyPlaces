@@ -17,15 +17,11 @@ import CoreData
 struct MyPlacesApp: App {
     
     let persistenceController = PersistenceController.shared
-    @StateObject private var dataManager: DataManager
+    @StateObject private var dataManager = DataManager.shared
     @StateObject private var settingsManager: SettingsManager
     
     init(){
         ArcGISEnvironment.apiKey = APIKey(Keys.apiKey)
-        
-        /// Initialize DataManager
-        let dataManager = DataManager(context: PersistenceController.shared.container.viewContext)
-        self._dataManager = StateObject(wrappedValue: dataManager)
         
         /// Initialize SettingsManager with proper context
         let settingsManager = SettingsManager(context: PersistenceController.shared.container.viewContext)

@@ -427,9 +427,3 @@ struct FavoritesPanel: View {
         }
     }
 }
-
-/// Notification extensions
-extension Notification.Name {
-    static let favoritesDidChange = Notification.Name("favoritesDidChange")
-    static let navigateToPOI = Notification.Name("navigateToPOI")
-}

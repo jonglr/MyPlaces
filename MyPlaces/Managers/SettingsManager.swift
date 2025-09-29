@@ -18,14 +18,13 @@ class SettingsManager: ObservableObject {
     @Published var user: UserProfile?
     @Published var theme: String = "explore"
     
-    static let shared = DataManager(context: PersistenceController.shared.container.viewContext)
-    private let context: NSManagedObjectContext
+    private var context: NSManagedObjectContext {
+        return PersistenceController.shared.container.viewContext
+    }
     
     // MARK: - Initialization
     
     init(context: NSManagedObjectContext) {
-        self.context = context
-        
         /// Try to load existing user immediately
         self.user = DataManager.shared.currentUser()
         
@@ -85,47 +84,51 @@ class SettingsManager: ObservableObject {
     func adopt(user: UserProfile) {
         DispatchQueue.main.async {
             self.user = user
-            // Post notification to ensure all UI updates
+            /// Post notification to ensure all UI updates
             NotificationCenter.default.post(name: .userDidChange, object: nil)
         }
     }
     
     func switchUser(withID id: UUID) -> UserProfile {
-        let request: NSFetchRequest<UserProfile> = UserProfile.fetchRequest()
-        request.predicate = NSPredicate(format: "userID == %@", id as CVarArg)
-        request.fetchLimit = 1
+        var switchedUser: UserProfile?
         
-        do {
-            /// Deactivate all users
-            let allUsers = try context.fetch(UserProfile.fetchRequest())
-            allUsers.forEach { $0.isActive = false }
+        context.performAndWait {
+            let request: NSFetchRequest<UserProfile> = UserProfile.fetchRequest()
+            request.predicate = NSPredicate(format: "userID == %@", id as CVarArg)
+            request.fetchLimit = 1
             
-            /// Activate the new active user
-            if let existingUser = try context.fetch(request).first {
-                existingUser.isActive = true
-                try context.save()
+            do {
+                /// Deactivate all users
+                let allUsers = try context.fetch(UserProfile.fetchRequest())
+                allUsers.forEach { $0.isActive = false }
                 
-                // Update the user property immediately
-                self.user = existingUser
-                
-                // Load the theme for the new user
-                let state = DataManager.shared.fetchThemeState()
-                self.theme = state.userTheme ?? state.predictedTheme ?? "explore"
-                
-                return existingUser
-            } else {
-                fatalError("Could not activate new user")
+                /// Activate the new active user
+                if let existingUser = try context.fetch(request).first {
+                    existingUser.isActive = true
+                    try context.save()
+                    
+                    switchedUser = existingUser
+                }
+            } catch {
+                print("Failed to switch user: \(error)")
             }
-        } catch {
-            fatalError("Failed to switch user: \(error)")
+        }
+        
+        /// Update UI properties outside performAndWait
+        if let user = switchedUser {
+            self.user = user
+            
+            /// Load the theme for the new user
+            let state = DataManager.shared.fetchThemeState()
+            self.theme = state.userTheme ?? state.predictedTheme ?? "explore"
+            
+            return user
+        } else {
+            fatalError("Could not activate new user")
         }
     }
     
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
-}
-
-extension Notification.Name {
-    static let themeDidChange = Notification.Name("themeDidChange")
 }

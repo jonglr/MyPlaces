@@ -593,8 +593,3 @@ struct AddUserView: View {
         }
     }
 }
-
-/// Notification extension to notify the system that the user changed
-extension Notification.Name {
-    static let userDidChange = Notification.Name("userDidChange")
-}

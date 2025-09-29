@@ -18,7 +18,6 @@ import CoreLocation
 class VariableManager {
     
     private let dataManager = DataManager.shared
-    private let context = PersistenceController.shared.container.viewContext
     
     private var weatherTask: Task<Double, Never>?
     private var environmentTask: Task<Double, Never>?
@@ -418,7 +417,8 @@ class VariableManager {
     }
         
     func getPOIDetails(poiID: UUID) -> (isFavorite: Double, clickCount: Double, daysAgo: Double) {
-        let (fav,click,days) = DataManager.shared.getPOIInteraction(poiID: poiID)
+        let (fav, click, days) = DataManager.shared.getPOIInteraction(poiID: poiID)
+        
         /// convert them into Double values for the model calculation
         let isFavorite: Double = fav ? 1.0 : 0.0
         let clickCount: Double = Double(click)

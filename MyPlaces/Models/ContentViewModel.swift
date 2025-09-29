@@ -35,7 +35,6 @@ class ContentViewModel: NSObject, ObservableObject {
     let variableManager = VariableManager()
     private let relevanceModelManager = RelevanceModelManager()
     private let thematicModelManager = ThematicModelManager()
-    private let context = PersistenceController.shared.container.viewContext
     private let dataManager = DataManager.shared
     
     /// All POI Storage (temporarely) before the relevant ones get published in order to get displayed
@@ -163,31 +162,37 @@ class ContentViewModel: NSObject, ObservableObject {
     
     /// Helper function to get relevance score for a POI
     func getRelevanceScore(for poi: ArcGISFeature) -> Double {
-        guard let user = dataManager.currentUser(),
-              let userID = user.userID,
-              let fidAny = poi.attributes["fid"],
+        guard let fidAny = poi.attributes["fid"],
               let fid = (fidAny as? NSNumber)?.int64Value else { return 0.0 }
         
         let poiID = variableManager.uuidFromFID(fid)
-        let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
-        request.predicate = NSPredicate(
-            format: "userID == %@ AND poiID == %@", 
-            userID as CVarArg,
-            poiID as CVarArg
-        )
-        do {
-            let scores = try context.fetch(request)
-            if let score = scores.first?.score {
-                return score
+        
+        var score: Double = 0.0
+        let context = PersistenceController.shared.container.viewContext
+        context.performAndWait {
+            guard let user = dataManager.currentUser(),
+                  let userID = user.userID else { return }
+            
+            let request: NSFetchRequest<RelevanceScore> = RelevanceScore.fetchRequest()
+            request.predicate = NSPredicate(
+                format: "userID == %@ AND poiID == %@",
+                userID as CVarArg,
+                poiID as CVarArg
+            )
+            do {
+                let scores = try context.fetch(request)
+                if let relevanceScore = scores.first {
+                    score = relevanceScore.score
+                }
+            } catch {
+                print("Error fetching relevance score: \(error)")
             }
-            return 0.0
-        } catch {
-            print("Error fetching relevance score: \(error)")
-            return 0.0
         }
+        return score
     }
     
     /// Relevance Score Calculation by the ML Model
+    @MainActor
     func updateRelevance() async {
         
         /// Handling the loading overlay
@@ -201,7 +206,7 @@ class ContentViewModel: NSObject, ObservableObject {
         }
         print("Predicting relevance scores...")
         
-        /// Refresh cached data once at the beginning of relevance calculation cycle
+        /// Refresh cached data once at the beginning
         let cacheRefreshSuccess = await variableManager.refreshCachedData()
         if !cacheRefreshSuccess {
             print("Failed to refresh cached data, using fallback values")
@@ -212,8 +217,11 @@ class ContentViewModel: NSObject, ObservableObject {
         let currentSpeed = variableManager.currentSpeed()
         let currentTheme = variableManager.currentUserTheme()
         
+        /// Collect scores for batch saving
+        var scoresToSave: [(poiID: UUID, score: Double, fid: Int64, relevanceData: String?)] = []
+        
         for poi in allPOIs {
-            /// Check if the fclass is defined in the conversion, if not -> it is not relevant and can be skipped
+            /// Check if the fclass is defined in the conversion
             guard let fclassRaw = poi.attributes["fclass"] as? String,
                   let fclass = variableManager.fclassConversion(fclass: fclassRaw) else {
                 continue
@@ -225,7 +233,7 @@ class ContentViewModel: NSObject, ObservableObject {
                 /// Transform the fid value into a UUID
                 let poiID = variableManager.uuidFromFID(fid)
                 
-                /// get the attributes for the score computation ot the poi
+                /// get the attributes for the score computation
                 let (isFavorite, clickCount, daysAgo) = variableManager.getPOIDetails(poiID: poiID)
                 let otherTags = poi.attributes["other_tags"] as? String ?? ""
                 let (open, _) = variableManager.isOpen(otherTags: otherTags)
@@ -268,21 +276,23 @@ class ContentViewModel: NSObject, ObservableObject {
                 /// Convert to a JSON String for CoreData saving
                 let jsonData = try? JSONSerialization.data(withJSONObject: relevanceAttributes)
                 let jsonString = jsonData != nil ? String(data: jsonData!, encoding: .utf8) : nil
-                            
                 
-                /// Simple main thread dispatch
-                await MainActor.run {
-                    dataManager.saveRelevanceScore(
-                        for: poiID,
-                        score: score,
-                        fid: fid,
-                        relevanceData: jsonString
-                    )
-                }
+                scoresToSave.append((poiID: poiID, score: score, fid: fid, relevanceData: jsonString))
             } else {
                 print("Missing or invalid 'osm_id' for POI: \(poi.attributes)")
             }
-            
+        }
+        
+        /// Batch save all scores at once
+        await MainActor.run {
+            for scoreData in scoresToSave {
+                dataManager.saveRelevanceScore(
+                    for: scoreData.poiID,
+                    score: scoreData.score,
+                    fid: scoreData.fid,
+                    relevanceData: scoreData.relevanceData
+                )
+            }
         }
     }
     
