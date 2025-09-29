@@ -619,7 +619,7 @@ class ContentViewModel: NSObject, ObservableObject {
         /// Get current user theme and corresponding fclasses for boosting
         let currentTheme = variableManager.currentUserTheme()
         let themeClasses = getFclassesForTheme(currentTheme)
-        let themeBoost = 50.0 /// Thematic Boost in percentage
+        let themeBoost = 33.0 /// Thematic Boost in percentage
         let thresholdSq = threshold * threshold
         
         for poi in pois {
