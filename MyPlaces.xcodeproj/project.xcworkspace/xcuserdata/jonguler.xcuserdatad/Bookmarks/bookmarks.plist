@@ -12,13 +12,13 @@
 					<key>EndingColumnNumber</key>
 					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>143</string>
+					<string>919</string>
 					<key>StartingColumnNumber</key>
 					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>142</string>
+					<string>919</string>
 					<key>Timestamp</key>
-					<string>779371667.366666</string>
+					<string>780832536.9704911</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -34,17 +34,13 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>                guard score &gt; 0.5 else { return nil }
-</string>
+				<string></string>
 				<key>leading</key>
-				<string>            let relevantPOIs = allPOIs.compactMap { poi -&gt; (poi: ArcGISFeature, score: Double, fclass: Double)? in
-                let score = getRelevanceScore(for: poi)
+				<string>    }
+}
 </string>
 				<key>trailing</key>
-				<string>                
-                /// Get fclass for thematic filtering
-                guard let fclassRaw = poi.attributes["fclass"] as? String,
-</string>
+				<string></string>
 			</dict>
 			<key>type</key>
 			<string>bookmark</string>
@@ -85,7 +81,7 @@
             if favorite == 1.0 {
                 return </string>
 				<key>trailing</key>
-				<string>.interestScore + 0.3   /// boost the favorites to make sure they show up
+				<string>.interestScore + 0.5   /// boost the favorites to make sure they show up
             }
             return output.interestScore
 </string>

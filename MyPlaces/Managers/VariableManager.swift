@@ -386,22 +386,6 @@ class VariableManager {
         return (0.0, 1.0)
     }
     
-    /// Calculate distance between two Point geometries (handles projected coordinates)
-    func calculateDistance(from point1: Point, to point2: Point) -> Double {
-        /// Check if coordinates look like projected coordinates (large values)
-        if abs(point1.x) > 180 || abs(point1.y) > 90 || abs(point2.x) > 180 || abs(point2.y) > 90 {
-            /// These are projected coordinates, use simple Euclidean distance
-            let deltaX = point1.x - point2.x
-            let deltaY = point1.y - point2.y
-            return sqrt(deltaX * deltaX + deltaY * deltaY)
-        } else {
-            /// These are lat/lon coordinates, use CLLocation
-            let location1 = CLLocation(latitude: point1.y, longitude: point1.x)
-            let location2 = CLLocation(latitude: point2.y, longitude: point2.x)
-            return location1.distance(from: location2)
-        }
-    }
-    
     /// Calculates the distance between the effective location and the POI Feature
     func calculateDistanceToUser(origin poi: ArcGISFeature) -> Double {
         /// Use effective location (search override or actual user location)
