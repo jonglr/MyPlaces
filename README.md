@@ -30,10 +30,10 @@ Each file has a short functionality description and overview at the top
 ## Visuals
 
 **Component Overview**
-/Users/jonguler/Library/Mobile Documents/com~apple~CloudDocs/Persönlich/8 Schule/Uni/3 Arbeiten/Masterarbeit/App Programming/App Screenshots/Overview/Map Overview.png
+![Map Interface](images/Map Overview.png)
 
 **Main Views**
-/Users/jonguler/Library/Mobile Documents/com~apple~CloudDocs/Persönlich/8 Schule/Uni/3 Arbeiten/Masterarbeit/App Programming/App Screenshots/Overview/Views Overview.png
+![Map Interface](images/Views Overview.png)
 
 ## Support
 For questions and support, reach out to johannes.guler@uzh.ch
