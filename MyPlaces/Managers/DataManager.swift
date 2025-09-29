@@ -336,21 +336,8 @@ class DataManager: ObservableObject {
     
     // MARK: - POI Management
     
-    func fetchPOI(poiID: UUID, context: NSManagedObjectContext) -> POI? {
-        let request: NSFetchRequest<POI> = POI.fetchRequest()
-        request.predicate = NSPredicate(format: "poiID == %@", poiID as CVarArg)
-        request.fetchLimit = 1
-        
-        do {
-            return try context.fetch(request).first
-        } catch {
-            print("Error fetching POI details: \(error)")
-            return nil
-        }
-    }
-    
     /// Update POI interaction (modified to work with user favorites)
-    func updatePOIInteraction(poiID: UUID, context: NSManagedObjectContext, isFavorite: Bool? = nil, fid: Int64) {
+    func updatePOIInteraction(poiID: UUID, isFavorite: Bool? = nil, fid: Int64) {
         guard let user = currentUser(),
               let userID = user.userID else {
             print("No current user to update interaction")
@@ -411,7 +398,7 @@ class DataManager: ObservableObject {
     }
     
     /// Get the interaction data of a specific POI
-    func getPOIInteraction(poiID: UUID, context: NSManagedObjectContext) -> (isFavorite: Bool, clickCount: Int32, lastClickedDate: Date) {
+    func getPOIInteraction(poiID: UUID) -> (isFavorite: Bool, clickCount: Int32, lastClickedDate: Date) {
         guard let user = currentUser() else {
             print("No current user to get interaction")
             return (false, 0, Date.distantPast)

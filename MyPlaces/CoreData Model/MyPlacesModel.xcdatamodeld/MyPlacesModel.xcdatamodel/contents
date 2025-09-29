@@ -10,10 +10,10 @@
         <attribute name="fid" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="isFavorite" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="lastClickedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="poiID" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="poiID" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="relevanceData" optional="YES" attributeType="String"/>
         <attribute name="score" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
-        <attribute name="userID" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="userID" attributeType="UUID" usesScalarValueType="NO"/>
         <relationship name="poi" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="POI" inverseName="relevance" inverseEntity="POI"/>
         <relationship name="user" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserProfile" inverseName="relevanceScores" inverseEntity="UserProfile"/>
     </entity>

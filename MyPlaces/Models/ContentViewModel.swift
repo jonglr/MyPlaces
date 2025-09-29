@@ -32,7 +32,7 @@ class ContentViewModel: NSObject, ObservableObject {
     /// The POI Model is initialized asynchronously (Favorites Panel needs to use it therefore not private)
     var poiModel: POIModel?
     /// Generate Managers
-    private let variableManager = VariableManager()
+    let variableManager = VariableManager()
     private let relevanceModelManager = RelevanceModelManager()
     private let thematicModelManager = ThematicModelManager()
     private let context = PersistenceController.shared.container.viewContext
@@ -53,14 +53,14 @@ class ContentViewModel: NSObject, ObservableObject {
     /// Throttling for location updates
     private var lastLocationUpdateTime: Date = Date(timeIntervalSince1970: 0)
     private let locationUpdateThrottle: TimeInterval = 2.0 /// Minimum 2 seconds between updates
-    private var currentSearchLocation: Point?
+    var currentSearchLocation: Point?
     private var relevanceUpdateTask: Task<Void, Never>?
     
     /// Aggregation control properties
     @Published var currentMapScale: Double = 1500 /// Default scale
     var lastAggregationScale: Double = 0
     private var aggregationTask: Task<Void, Never>?
-    private var unfilteredRelevantPOIs: [ArcGISFeature] = [] /// Store POIs before aggregation
+    var unfilteredRelevantPOIs: [ArcGISFeature] = [] /// Store POIs before aggregation
     /// Threshold for scale change to trigger re-aggregation
     private let scaleChangeThreshold: Double = 0.25 /// 25% change
     
@@ -685,7 +685,7 @@ class ContentViewModel: NSObject, ObservableObject {
         if let fidAny = poi.attributes["fid"],
            let fid = (fidAny as? NSNumber)?.int64Value {
             let poiID = variableManager.uuidFromFID(fid)
-            dataManager.updatePOIInteraction(poiID: poiID, context: context, isFavorite: true, fid: fid)
+            dataManager.updatePOIInteraction(poiID: poiID, isFavorite: true, fid: fid)
         }
     }
     
@@ -693,7 +693,7 @@ class ContentViewModel: NSObject, ObservableObject {
         if let fidAny = poi.attributes["fid"],
            let fid = (fidAny as? NSNumber)?.int64Value {
             let poiID = variableManager.uuidFromFID(fid)
-            dataManager.updatePOIInteraction(poiID: poiID, context: context, fid: fid)
+            dataManager.updatePOIInteraction(poiID: poiID, fid: fid)
         }
     }
     

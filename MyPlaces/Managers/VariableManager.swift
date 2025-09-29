@@ -418,7 +418,7 @@ class VariableManager {
     }
         
     func getPOIDetails(poiID: UUID) -> (isFavorite: Double, clickCount: Double, daysAgo: Double) {
-        let (fav,click,days) = DataManager.shared.getPOIInteraction(poiID: poiID, context: context)
+        let (fav,click,days) = DataManager.shared.getPOIInteraction(poiID: poiID)
         /// convert them into Double values for the model calculation
         let isFavorite: Double = fav ? 1.0 : 0.0
         let clickCount: Double = Double(click)

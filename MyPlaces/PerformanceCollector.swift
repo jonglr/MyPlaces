@@ -195,13 +195,16 @@ extension ContentViewModel {
         
         /// Test scenarios
         let scenarios: [(env: String, location: CLLocationCoordinate2D, scales: [Double])] = [
-            ("urban", CLLocationCoordinate2D(latitude: 47.36710171948785, longitude: 8.544993558283764), [500, 1500, 5000]),  /// Zurich
-            ("rural", CLLocationCoordinate2D(latitude: 47.28153696765743, longitude: 8.76032601731975), [1000, 3000, 10000]), /// Grüningen
-            ("outdoor", CLLocationCoordinate2D(latitude: 46.49758498731219, longitude: 7.714351572567751), [2000, 5000, 15000]) /// Oeschniensee
+            ("urban", CLLocationCoordinate2D(latitude: 47.367101, longitude: 8.544993), [500, 1500, 5000]),  /// Zurich
+            ("rural", CLLocationCoordinate2D(latitude: 47.252291, longitude: 8.767640), [500, 1500, 5000]), /// Hombrechtikon
+            ("outdoor", CLLocationCoordinate2D(latitude: 47.256108, longitude: 9.318799), [500, 1500, 5000]) /// Schwägalp
         ]
         
         for scenario in scenarios {
             for scale in scenario.scales {
+                self.unfilteredRelevantPOIs.removeAll()
+                self.displayedPOIs.removeAll()
+                
                 print("\nTesting: \(scenario.env.uppercased()) at scale \(scale)")
                 
                 collector.setEnvironment(scenario.env)
@@ -212,6 +215,11 @@ extension ContentViewModel {
                                     y: scenario.location.latitude,
                                     spatialReference: .wgs84)
                 
+                /// Set virutal location
+                variableManager.setSearchLocationOverride(location)
+                self.isUsingSearchLocation = true
+                self.currentSearchLocation = location
+                
                 /// POI Loading
                 let loadStart = CFAbsoluteTimeGetCurrent()
                 await reloadPOIsForLocation(location)
@@ -219,7 +227,7 @@ extension ContentViewModel {
                 
                 /// Theme Prediction
                 let themeStart = CFAbsoluteTimeGetCurrent()
-                await updateTheme()
+                DataManager.shared.setUserTheme(theme: "explore") /// Force explore theme
                 collector.recordThematicPrediction(time: CFAbsoluteTimeGetCurrent() - themeStart)
                 
                 /// Relevance Scoring
@@ -232,12 +240,15 @@ extension ContentViewModel {
 
                 /// Aggregation (measure and capture displayed POIs)
                 let aggStart = CFAbsoluteTimeGetCurrent()
-                let beforeCount = allPOIs.count
                 self.currentMapScale = scale   /// apply scenario scale
                 self.lastAggregationScale = 0  /// force re-aggregation
+
                 await loadRelevanceScores()  /// this should populate displayedPOIs
+                let beforeCount = allPOIs.count
+                
                 await quickReaggregate()       /// rebuild displayed list using current scale
                 let afterCount = displayedPOIs.count
+                
                 collector.recordAggregation(
                     time: CFAbsoluteTimeGetCurrent() - aggStart,
                     beforeCount: beforeCount,
