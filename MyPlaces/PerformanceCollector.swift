@@ -227,7 +227,7 @@ extension ContentViewModel {
                 
                 /// Theme Prediction
                 let themeStart = CFAbsoluteTimeGetCurrent()
-                DataManager.shared.setUserTheme(theme: "explore") /// Force explore theme
+                await updateTheme()
                 collector.recordThematicPrediction(time: CFAbsoluteTimeGetCurrent() - themeStart)
                 
                 /// Relevance Scoring
