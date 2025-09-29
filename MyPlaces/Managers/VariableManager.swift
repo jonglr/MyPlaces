@@ -29,6 +29,9 @@ class VariableManager {
     private var searchLocationOverride: Point?
     private var isUsingSearchLocation = false
     
+    /// Cached projected user/search location in Web Mercator
+    private var cachedUserPointWebMercator: Point?
+    
     init() {
         currentThemeString = resolveEffectiveTheme()
         NotificationCenter.default.addObserver(
@@ -385,38 +388,32 @@ class VariableManager {
         }
         return (0.0, 1.0)
     }
-    
+
     /// Calculates the distance between the effective location and the POI Feature
     func calculateDistanceToUser(origin poi: ArcGISFeature) -> Double {
-        /// Use effective location (search override or actual user location)
-        guard let point = getEffectiveLocationPoint() else {
+        /// Use cached projected user/search location
+        guard let userPointWebMercator = cachedUserPointWebMercator else {
             print("No effective location available for distance calculation")
             return 360.0
         }
-        
+
         /// Get the POI Geometry and convert into a Point Feature
         guard let poiPoint = poi.geometry as? Point else {
             print("POI geometry unavailable")
             return 360.0
         }
-        
-        /// Calculate distance using the effective location
-        guard
-            let userPoint = GeometryEngine.project(point, into: .webMercator),
-            let featurePoint = GeometryEngine.project(poiPoint, into: .webMercator)
-        else {
-            print("Projection failed for distance calculation")
-            return 360.0
-        }
 
-        let distanceMeters = GeometryEngine.distance(from: userPoint, to: featurePoint)
+        /// POI points are already in Web Mercator, so use directly
+        let featurePoint = poiPoint
+
+        let distanceMeters = GeometryEngine.distance(from: userPointWebMercator, to: featurePoint)
         let distanceKm = distanceMeters / 1000
-        
+
         guard !distanceKm.isNaN else {
             print("Distance calculation resulted in NaN")
             return 360.0
         }
-        
+
         return distanceKm
     }
         
@@ -455,16 +452,40 @@ class VariableManager {
         isUsingSearchLocation = location != nil
         if let loc = location {
             print("Search location override set to: \(loc.x), \(loc.y)")
+            /// Cache projected point in Web Mercator
+            if let projected = GeometryEngine.project(loc, into: .webMercator) {
+                cachedUserPointWebMercator = projected
+            } else {
+                cachedUserPointWebMercator = nil
+            }
         } else {
             print("Search location override cleared")
+            /// When clearing, update cache with actual user location
+            if let current = getCurrentLocationPoint(),
+               let projected = GeometryEngine.project(current, into: .webMercator) {
+                cachedUserPointWebMercator = projected
+            } else {
+                cachedUserPointWebMercator = nil
+            }
         }
     }
 
     /// Get effective location (search override or actual user location)
     func getEffectiveLocationPoint() -> Point? {
         if isUsingSearchLocation, let searchLocation = searchLocationOverride {
+            /// Already cached in setSearchLocationOverride
             return searchLocation
         }
-        return getCurrentLocationPoint()
+        /// Not using override, get current location and update cache
+        if let current = getCurrentLocationPoint() {
+            if let projected = GeometryEngine.project(current, into: .webMercator) {
+                cachedUserPointWebMercator = projected
+            } else {
+                cachedUserPointWebMercator = nil
+            }
+            return current
+        }
+        cachedUserPointWebMercator = nil
+        return nil
     }
 }

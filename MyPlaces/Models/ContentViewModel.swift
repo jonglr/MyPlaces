@@ -610,6 +610,7 @@ class ContentViewModel: NSObject, ObservableObject {
         let currentTheme = variableManager.currentUserTheme()
         let themeClasses = getFclassesForTheme(currentTheme)
         let themeBoost = 50.0 /// Thematic Boost in percentage
+        let thresholdSq = threshold * threshold
         
         for poi in pois {
             guard let fidAny = poi.attributes["fid"],
@@ -625,8 +626,15 @@ class ContentViewModel: NSObject, ObservableObject {
                       let otherGeometry = other.geometry as? Point,
                       !visited.contains(otherFid) else { return false }
                 
-                let distance = GeometryEngine.distance(from: geometry, to: otherGeometry)
-                return distance < threshold
+                let dx = geometry.x - otherGeometry.x
+                let dy = geometry.y - otherGeometry.y
+                           
+                /// Quick bounding-box reject
+                if abs(dx) > threshold || abs(dy) > threshold {
+                    return false
+                }
+                /// Squared distance check
+                return dx*dx + dy*dy < thresholdSq
             }
             
             /// Include self in group
