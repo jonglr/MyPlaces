@@ -6,15 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="3026e421-7b4e-4157-99a0-0bf879726700" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/../MyPlaces.xcodeproj/project.pbxproj" beforeDir="false" afterPath="$PROJECT_DIR$/../MyPlaces.xcodeproj/project.pbxproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../MyPlaces.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" beforeDir="false" afterPath="$PROJECT_DIR$/../MyPlaces.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../MyPlaces.xcodeproj/project.xcworkspace/xcuserdata/jonguler.xcuserdatad/Bookmarks/bookmarks.plist" beforeDir="false" afterPath="$PROJECT_DIR$/../MyPlaces.xcodeproj/project.xcworkspace/xcuserdata/jonguler.xcuserdatad/Bookmarks/bookmarks.plist" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../MyPlaces/Models/ContentViewModel.swift" beforeDir="false" afterPath="$PROJECT_DIR$/../MyPlaces/Models/ContentViewModel.swift" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../MyPlaces/Resources/Thematic.mlmodel" beforeDir="false" afterPath="$PROJECT_DIR$/../MyPlaces/Resources/Thematic.mlmodel" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../MyPlaces/Views/UserSwitchView.swift" beforeDir="false" afterPath="$PROJECT_DIR$/../MyPlaces/Views/UserSwitchView.swift" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/attribute_calculator.py" beforeDir="false" afterPath="$PROJECT_DIR$/attribute_calculator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/synthetic_thematic.csv" beforeDir="false" afterPath="$PROJECT_DIR$/synthetic_thematic.csv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/thematic.py" beforeDir="false" afterPath="$PROJECT_DIR$/thematic.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -238,6 +230,9 @@
       <workItem from="1758713498216" duration="1620000" />
       <workItem from="1758926783390" duration="24000" />
       <workItem from="1758931514374" duration="616000" />
+      <workItem from="1763196942170" duration="3720000" />
+      <workItem from="1763319447673" duration="218000" />
+      <workItem from="1763372782913" duration="1984000" />
     </task>
     <servers />
   </component>
