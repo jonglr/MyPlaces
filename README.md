@@ -36,4 +36,4 @@ Each file has a short functionality description and overview at the top
 ![Map Interface](images/Views Overview.png)
 
 ## Support
-For questions and support, reach out to johannes.guler@uzh.ch
+For questions and support, reach out to jon.guler@bluewin.ch
