@@ -30,10 +30,10 @@ Each file has a short functionality description and overview at the top
 ## Visuals
 
 **Component Overview**
-![Map Interface](/images/Map Overview.png)
+![Map Interface](/images/MapOverview.png)
 
 **Main Views**
-![App Views](/images/Views Overview.png)
+![App Views](/images/ViewsOverview.png)
 
 ## Support
 For questions and support, reach out to jon.guler@bluewin.ch
